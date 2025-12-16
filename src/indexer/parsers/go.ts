@@ -1,5 +1,5 @@
 import type { Parser, ParsedStructure } from './base.js';
-import { getLineNumber, extractLines } from './base.js';
+import { getLineNumber, extractLines, extractCalls } from './base.js';
 
 const patterns = {
   // func name(...) or func (r Receiver) name(...)
@@ -53,6 +53,7 @@ export const goParser: Parser = {
 
       // Check if it's a method (has receiver)
       const isMethod = match[0].includes(') ' + name);
+      const rawContent = extractLines(content, lineStart, lineEnd);
 
       structures.push({
         type: isMethod ? 'method' : 'function',
@@ -60,10 +61,11 @@ export const goParser: Parser = {
         lineStart,
         lineEnd,
         signature: match[0].trim(),
-        rawContent: extractLines(content, lineStart, lineEnd),
+        rawContent,
         metadata: {
           params: params.split(',').map(p => p.trim()).filter(Boolean),
         },
+        calls: extractCalls(rawContent, name),
       });
     }
 

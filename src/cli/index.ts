@@ -9,6 +9,7 @@ import { queryCommand } from './commands/query.js';
 import { mcpServeCommand } from './commands/mcp-serve.js';
 import { setupCommand } from './commands/setup.js';
 import { importCommand } from './commands/import.js';
+import { visualizeCommand } from './commands/visualize.js';
 
 const program = new Command();
 
@@ -99,6 +100,23 @@ program
       dryRun: options.dryRun,
       limit: parseInt(options.limit, 10),
       full: options.full,
+    });
+  });
+
+// Visualize codebase as interactive dashboard
+program
+  .command('visualize')
+  .description('Generate an interactive visualization dashboard of the codebase')
+  .option('-o, --output <path>', 'Output file path (default: ./aimem-dashboard.html)')
+  .option('--open', 'Open dashboard in browser after generating')
+  .option('-s, --serve', 'Start a local server instead of generating a static file')
+  .option('-p, --port <port>', 'Server port when using --serve (default: 8080)')
+  .action(async (options) => {
+    await visualizeCommand({
+      output: options.output,
+      open: options.open,
+      serve: options.serve,
+      port: options.port ? parseInt(options.port, 10) : undefined,
     });
   });
 

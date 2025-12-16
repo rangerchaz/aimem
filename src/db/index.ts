@@ -356,3 +356,43 @@ export function searchFullConversations(query: string, limit = 20, projectId?: n
     LIMIT ?
   `).all(query, limit) as Conversation[];
 }
+
+// Structure with file path for visualization
+export interface StructureWithFile extends Structure {
+  file_path: string;
+}
+
+// Get all structures for a project with file paths
+export function getAllProjectStructures(projectId: number): StructureWithFile[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT s.*, f.path as file_path
+    FROM structures s
+    JOIN files f ON s.file_id = f.id
+    WHERE f.project_id = ?
+    ORDER BY f.path, s.line_start
+  `).all(projectId) as StructureWithFile[];
+}
+
+// Get all links for a project
+export function getAllProjectLinks(projectId: number): Link[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT DISTINCT l.* FROM links l
+    LEFT JOIN structures s ON l.source_type = 'structure' AND l.source_id = s.id
+    LEFT JOIN files f ON s.file_id = f.id
+    LEFT JOIN conversations c ON l.source_type = 'conversation' AND l.source_id = c.id
+    WHERE f.project_id = ? OR c.project_id = ?
+  `).all(projectId, projectId) as Link[];
+}
+
+// Get all extractions for a project
+export function getAllProjectExtractions(projectId: number): Extraction[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT e.* FROM extractions e
+    JOIN conversations c ON e.conversation_id = c.id
+    WHERE c.project_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(projectId) as Extraction[];
+}

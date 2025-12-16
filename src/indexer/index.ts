@@ -2,12 +2,18 @@ import { readFileSync, statSync } from 'fs';
 import { join, extname, relative } from 'path';
 import { createHash } from 'crypto';
 import { glob } from 'glob';
-import { upsertFile, deleteFileStructures, insertStructure, getProjectFiles, deleteFile } from '../db/index.js';
+import { upsertFile, deleteFileStructures, insertStructure, getProjectFiles, deleteFile, getStructuresByName, createLink, getDb } from '../db/index.js';
 import type { Parser, ParsedStructure } from './parsers/base.js';
 import { javascriptParser } from './parsers/javascript.js';
 import { pythonParser } from './parsers/python.js';
 import { rubyParser } from './parsers/ruby.js';
 import { goParser } from './parsers/go.js';
+
+// Store pending calls to resolve after all structures are indexed
+interface PendingCall {
+  callerId: number;
+  calledName: string;
+}
 
 // Register all parsers
 const parsers: Parser[] = [
@@ -65,7 +71,12 @@ async function getProjectFilePaths(projectPath: string): Promise<string[]> {
   return files;
 }
 
-export async function indexFile(projectId: number, projectPath: string, relativePath: string): Promise<number> {
+export async function indexFile(
+  projectId: number,
+  projectPath: string,
+  relativePath: string,
+  pendingCalls?: PendingCall[]
+): Promise<number> {
   const fullPath = join(projectPath, relativePath);
   const parser = getParser(fullPath);
 
@@ -87,7 +98,7 @@ export async function indexFile(projectId: number, projectPath: string, relative
     const structures = parser.parse(content, relativePath);
 
     for (const s of structures) {
-      insertStructure(
+      const inserted = insertStructure(
         file.id,
         s.type,
         s.name,
@@ -97,6 +108,16 @@ export async function indexFile(projectId: number, projectPath: string, relative
         s.rawContent,
         s.metadata
       );
+
+      // Collect pending calls to resolve later
+      if (pendingCalls && s.calls && s.calls.length > 0) {
+        for (const calledName of s.calls) {
+          pendingCalls.push({
+            callerId: inserted.id,
+            calledName,
+          });
+        }
+      }
     }
 
     return structures.length;
@@ -107,14 +128,27 @@ export async function indexFile(projectId: number, projectPath: string, relative
   }
 }
 
-export async function indexProject(projectId: number, projectPath: string): Promise<{ files: number; structures: number }> {
+export async function indexProject(projectId: number, projectPath: string): Promise<{ files: number; structures: number; links: number }> {
   const filePaths = await getProjectFilePaths(projectPath);
+  const pendingCalls: PendingCall[] = [];
 
   let totalStructures = 0;
   let indexedFiles = 0;
 
+  // Clear existing call links for this project before re-indexing
+  const db = getDb();
+  db.prepare(`
+    DELETE FROM links WHERE link_type IN ('calls', 'called_by')
+    AND source_type = 'structure'
+    AND source_id IN (
+      SELECT s.id FROM structures s
+      JOIN files f ON s.file_id = f.id
+      WHERE f.project_id = ?
+    )
+  `).run(projectId);
+
   for (const relativePath of filePaths) {
-    const count = await indexFile(projectId, projectPath, relativePath);
+    const count = await indexFile(projectId, projectPath, relativePath, pendingCalls);
     if (count > 0) {
       indexedFiles++;
       totalStructures += count;
@@ -131,8 +165,22 @@ export async function indexProject(projectId: number, projectPath: string): Prom
     }
   }
 
-  console.log(`  Indexed ${indexedFiles} files, ${totalStructures} structures`);
-  return { files: indexedFiles, structures: totalStructures };
+  // Resolve pending calls and create links
+  let linksCreated = 0;
+  for (const pending of pendingCalls) {
+    const targets = getStructuresByName(pending.calledName, projectId);
+    if (targets.length > 0) {
+      // Link to the first match (could be improved with scope analysis)
+      const target = targets[0];
+      if (target.id !== pending.callerId) { // Don't link to self
+        createLink('structure', pending.callerId, 'structure', target.id, 'calls');
+        linksCreated++;
+      }
+    }
+  }
+
+  console.log(`  Indexed ${indexedFiles} files, ${totalStructures} structures, ${linksCreated} call links`);
+  return { files: indexedFiles, structures: totalStructures, links: linksCreated };
 }
 
 export function getSupportedExtensions(): string[] {

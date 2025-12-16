@@ -1,5 +1,5 @@
 import type { Parser, ParsedStructure } from './base.js';
-import { getLineNumber, extractLines } from './base.js';
+import { getLineNumber, extractLines, extractCalls } from './base.js';
 
 const patterns = {
   // def name(...) or def self.name(...)
@@ -52,17 +52,19 @@ export const rubyParser: Parser = {
       const lineStart = getLineNumber(content, match.index);
       const lineEnd = findRubyBlockEnd(content, lineStart);
 
+      const rawContent = extractLines(content, lineStart, lineEnd);
       structures.push({
         type: 'method',
         name: isClassMethod ? `self.${name}` : name,
         lineStart,
         lineEnd,
         signature: `def ${isClassMethod ? 'self.' : ''}${name}(${params})`,
-        rawContent: extractLines(content, lineStart, lineEnd),
+        rawContent,
         metadata: {
           classMethod: isClassMethod,
           params: params.split(',').map(p => p.trim()).filter(Boolean),
         },
+        calls: extractCalls(rawContent, name),
       });
     }
 

@@ -1,5 +1,5 @@
 import type { Parser, ParsedStructure } from './base.js';
-import { getLineNumber, extractLines } from './base.js';
+import { getLineNumber, extractLines, extractCalls } from './base.js';
 
 // Patterns for JavaScript/TypeScript
 const patterns = {
@@ -76,6 +76,7 @@ export const javascriptParser: Parser = {
       const lineStart = getLineNumber(content, match.index);
       const blockEnd = findBlockEnd(content, match.index);
       const lineEnd = getLineNumber(content, blockEnd);
+      const rawContent = extractLines(content, lineStart, lineEnd);
 
       structures.push({
         type: 'function',
@@ -83,8 +84,9 @@ export const javascriptParser: Parser = {
         lineStart,
         lineEnd,
         signature: `function ${name}(${params})`,
-        rawContent: extractLines(content, lineStart, lineEnd),
+        rawContent,
         metadata: { params: params.split(',').map(p => p.trim()).filter(Boolean) },
+        calls: extractCalls(rawContent, name),
       });
     }
 
@@ -95,6 +97,7 @@ export const javascriptParser: Parser = {
       const lineStart = getLineNumber(content, match.index);
       const blockEnd = findBlockEnd(content, match.index);
       const lineEnd = getLineNumber(content, blockEnd);
+      const rawContent = extractLines(content, lineStart, lineEnd);
 
       structures.push({
         type: 'function',
@@ -102,8 +105,9 @@ export const javascriptParser: Parser = {
         lineStart,
         lineEnd,
         signature: `const ${name} = () => ...`,
-        rawContent: extractLines(content, lineStart, lineEnd),
+        rawContent,
         metadata: { arrow: true },
+        calls: extractCalls(rawContent, name),
       });
     }
 
