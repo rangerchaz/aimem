@@ -348,7 +348,7 @@ To reinforce this, add a `CLAUDE.md` file to your project root:
 
 ```markdown
 ## Memory (aimem)
-3
+
 Before claiming something isn't implemented or needs to be built:
 1. Query `aimem_decisions <topic>` to check past decisions
 2. Query `aimem_verify <name>` to check if a function/class exists
