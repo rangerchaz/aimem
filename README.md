@@ -354,10 +354,11 @@ Before claiming something isn't implemented or needs to be built:
 2. Query `aimem_verify <name>` to check if a function/class exists
 
 Available aimem tools:
-- `aimem_decisions <topic>` - What was decided about this topic?
-- `aimem_context <entity>` - Full context for a function/class
 - `aimem_query <search>` - Search code and conversations
+- `aimem_context <entity>` - Full context for a function/class
+- `aimem_decisions <topic>` - What was decided about this topic?
 - `aimem_verify <name>` - Does this function/file exist?
+- `aimem_conversations <query>` - Search past conversation history
 ```
 
 ## Other Tools (Cursor, Continue.dev, etc.)
