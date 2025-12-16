@@ -159,6 +159,7 @@ source ~/.bashrc
 | `aimem stop` | Stop running services |
 | `aimem status` | Show services and database stats |
 | `aimem query <search>` | Search structures and conversations |
+| `aimem visualize` | Generate interactive codebase dashboard |
 
 ### Setup Commands
 
@@ -214,6 +215,36 @@ aimem query "class" -t structures    # Only search code structures
 aimem query "auth" -t conversations  # Only search conversations
 aimem query "api" -l 20              # Limit to 20 results
 ```
+
+### Visualization Dashboard
+
+Generate an interactive HTML dashboard to explore your codebase visually:
+
+```bash
+aimem visualize                      # Generate dashboard.html
+aimem visualize --output ./viz.html  # Custom output path
+aimem visualize --open               # Open in browser after generating
+aimem visualize --serve              # Start live server on port 8080
+aimem visualize --serve --port 3000  # Custom port
+```
+
+**Dashboard Features:**
+
+| View | Description |
+|------|-------------|
+| **Overview** | All files in your codebase at a glance |
+| **Call Graph** | Function/method call relationships |
+| **Dependencies** | File-level relationships |
+| **Classes** | Class hierarchy and methods |
+| **Decisions** | Architectural decisions linked to code |
+
+**Interactions:**
+- **Click** - View details and source code
+- **Double-click** - Drill down into files, classes, or functions
+- **Search** - Find by name, file path, or signature
+- **Flow tracing** - Trace downstream calls or upstream callers
+- **Visual/List toggle** - Switch between graph and list views
+- **Back button** - Navigate drill-down history
 
 ## Proxy Setup
 
