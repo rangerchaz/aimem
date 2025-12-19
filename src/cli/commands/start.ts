@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import { existsSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -6,19 +6,6 @@ import chalk from 'chalk';
 import { getDataDir, ensureDataDir } from '../../db/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function isMitmproxyInstalled(): boolean {
-  try {
-    const result = spawnSync('mitmdump', ['--version'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
 
 interface StartOptions {
   proxy?: boolean;
@@ -62,27 +49,23 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   console.log(chalk.bold('Starting aimem services...\n'));
 
-  // Start proxy
+  // Start proxy (mockttp-based, pure Node.js)
   if (startProxy) {
     const existingPid = getServicePid('proxy');
     if (existingPid) {
       console.log(chalk.yellow(`Proxy already running (PID ${existingPid})`));
-    } else if (!isMitmproxyInstalled()) {
-      console.log(chalk.red('✗ mitmproxy is not installed'));
-      console.log(chalk.yellow('\n  mitmproxy is required for context capture. Install it with:\n'));
-      console.log(chalk.white('    pip install mitmproxy\n'));
-      console.log(chalk.gray('  After installing, run `aimem start` again.'));
     } else {
-      const interceptorPath = join(__dirname, '..', '..', 'proxy', 'interceptor.py');
+      const proxyDaemonPath = join(__dirname, '..', '..', 'proxy', 'proxy-daemon.js');
 
       try {
-        const child = spawn('mitmdump', [
-          '-s', interceptorPath,
-          '-p', String(port),
-          '--set', `data_dir=${dataDir}`,
-        ], {
+        const child = spawn('node', [proxyDaemonPath], {
           detached: true,
           stdio: 'ignore',
+          env: {
+            ...process.env,
+            AIMEM_DATA_DIR: dataDir,
+            AIMEM_PROXY_PORT: String(port),
+          },
         });
 
         if (child.pid) {
@@ -90,10 +73,18 @@ export async function startCommand(options: StartOptions): Promise<void> {
           child.unref();
           console.log(chalk.green(`Proxy started on port ${port} (PID ${child.pid})`));
           console.log(chalk.gray(`  Configure tools with: HTTP_PROXY=http://localhost:${port}`));
+
+          // Show cert path
+          const certPath = join(dataDir, 'ca-cert.pem');
+          if (existsSync(certPath)) {
+            console.log(chalk.gray(`  CA certificate: ${certPath}`));
+          } else {
+            console.log(chalk.gray(`  CA certificate will be generated at: ${certPath}`));
+          }
         }
       } catch (err) {
         console.log(chalk.red('Failed to start proxy.'));
-        console.log(chalk.gray('  Check mitmproxy installation: pip install mitmproxy'));
+        console.log(chalk.gray(`  Error: ${err}`));
       }
     }
   }
