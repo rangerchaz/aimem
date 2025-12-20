@@ -124,6 +124,34 @@ source ~/.bashrc  # or ~/.zshrc
 
 After restart, Claude Code will have MCP tools available to query your project's memory.
 
+### For Claude Desktop Users
+
+```bash
+# 1. Index your project
+cd /path/to/your/project
+aimem init
+
+# 2. Add MCP server to Claude Desktop config
+# macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
+# Windows: %APPDATA%\Claude\claude_desktop_config.json
+```
+
+Add to your config:
+```json
+{
+  "mcpServers": {
+    "aimem": {
+      "command": "aimem",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop. The MCP tools will be available for querying your project's memory.
+
+> **Note:** Proxy capture may not work with Claude Desktop (depends on Electron proxy settings). MCP query tools work regardless.
+
 ### For Other Tools (Cursor, Continue.dev, etc.)
 
 ```bash
