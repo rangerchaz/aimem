@@ -283,6 +283,11 @@ Available aimem tools:
 - Python (`.py`, `.pyw`)
 - Ruby (`.rb`, `.rake`)
 - Go (`.go`)
+- Rust (`.rs`)
+- Java (`.java`)
+- Kotlin (`.kt`, `.kts`)
+- C / C++ (`.c`, `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp`, `.hxx`, `.hh`)
+- PHP (`.php`, `.phtml`, `.php5`, `.php7`, `.php8`)
 
 ## Data Storage
 

@@ -8,6 +8,11 @@ import { javascriptParser } from './parsers/javascript.js';
 import { pythonParser } from './parsers/python.js';
 import { rubyParser } from './parsers/ruby.js';
 import { goParser } from './parsers/go.js';
+import { rustParser } from './parsers/rust.js';
+import { javaParser } from './parsers/java.js';
+import { kotlinParser } from './parsers/kotlin.js';
+import { cppParser } from './parsers/cpp.js';
+import { phpParser } from './parsers/php.js';
 import { isGitRepo, getBlameForLines } from '../git/index.js';
 
 // Store pending calls to resolve after all structures are indexed
@@ -22,6 +27,11 @@ const parsers: Parser[] = [
   pythonParser,
   rubyParser,
   goParser,
+  rustParser,
+  javaParser,
+  kotlinParser,
+  cppParser,
+  phpParser,
 ];
 
 // Build extension to parser map
