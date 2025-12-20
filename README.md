@@ -316,16 +316,46 @@ Available aimem tools:
 
 ## Data Storage
 
-Everything is stored locally in `~/.aimem/`:
+Everything is stored locally:
+
+| OS | Default Location |
+|----|------------------|
+| Linux/macOS | `~/.aimem/` |
+| Windows | `C:\Users\<user>\.aimem\` |
+| WSL | `/home/<user>/.aimem/` |
 
 ```
-~/.aimem/
+.aimem/
 ├── aimem.db        # SQLite database
 ├── ca-cert.pem     # Proxy CA certificate
 ├── ca-key.pem      # Proxy CA key
 ├── proxy.pid       # Proxy process ID
 └── watcher.pid     # Watcher process ID
 ```
+
+### Custom Data Directory
+
+Set `AIMEM_DATA_DIR` to use a custom location:
+
+```bash
+export AIMEM_DATA_DIR="/path/to/shared/.aimem"
+```
+
+### Sharing Database Between WSL and Windows
+
+To use the same database from both WSL and Windows:
+
+**WSL** (add to `~/.bashrc` or `~/.zshrc`):
+```bash
+export AIMEM_DATA_DIR="/mnt/c/Users/<user>/.aimem"
+```
+
+**Windows** (PowerShell profile or System Environment Variables):
+```powershell
+$env:AIMEM_DATA_DIR = "C:\Users\<user>\.aimem"
+```
+
+Then restart your terminals and Claude Code.
 
 No cloud. No accounts. Code never leaves your machine.
 

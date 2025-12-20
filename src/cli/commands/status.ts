@@ -1,21 +1,7 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { spawnSync } from 'child_process';
 import { getStats, getAllProjects, getDataDir } from '../../db/index.js';
-
-function isMitmproxyInstalled(): boolean {
-  try {
-    const result = spawnSync('mitmdump', ['--version'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
 
 interface ServiceStatus {
   running: boolean;
@@ -45,14 +31,6 @@ export function statusCommand(): void {
   // Data directory
   console.log(chalk.gray(`Data directory: ${dataDir}`));
   console.log();
-
-  // Dependencies
-  const mitmproxyOk = isMitmproxyInstalled();
-  if (!mitmproxyOk) {
-    console.log(chalk.bold('Dependencies:'));
-    console.log(`  mitmproxy: ${chalk.red('not installed')} ${chalk.gray('(pip install mitmproxy)')}`);
-    console.log();
-  }
 
   // Services
   console.log(chalk.bold('Services:'));

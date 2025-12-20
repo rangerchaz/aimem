@@ -5,18 +5,20 @@ import { mkdirSync, existsSync } from 'fs';
 import { SCHEMA, MIGRATIONS, COMMIT_LINKS_SCHEMA } from './schema.js';
 import type { Project, File, Structure, Conversation, Link, Extraction, IndexStats, Commit, CommitLink } from '../types/index.js';
 
-const DATA_DIR = join(homedir(), '.aimem');
-const DB_PATH = join(DATA_DIR, 'aimem.db');
+function resolveDataDir(): string {
+  return process.env.AIMEM_DATA_DIR || join(homedir(), '.aimem');
+}
 
 let db: Database.Database | null = null;
 
 export function getDataDir(): string {
-  return DATA_DIR;
+  return resolveDataDir();
 }
 
 export function ensureDataDir(): void {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
+  const dataDir = resolveDataDir();
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
   }
 }
 
@@ -36,7 +38,8 @@ function applyMigrations(database: Database.Database): void {
 export function getDb(): Database.Database {
   if (!db) {
     ensureDataDir();
-    db = new Database(DB_PATH);
+    const dbPath = join(resolveDataDir(), 'aimem.db');
+    db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
