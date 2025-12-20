@@ -15,7 +15,7 @@ aimem fixes this:
 
 No cloud. No accounts. Everything stays on your machine.
 
-## v2.0 - Lean Architecture
+## Lean Architecture
 
 - **Pure Node.js** - No Python dependencies (mockttp proxy)
 - **Capture-only** - No injection, uses CLAUDE.md for instructions
