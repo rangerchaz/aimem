@@ -77,10 +77,9 @@ Before claiming something isn't implemented or needs to be built:
 2. Query `aimem_verify <name>` to check if a function/class exists
 
 Available aimem MCP tools:
-- `aimem_query <search>` - Search code, conversations, and decisions (type: all|structures|conversations|decisions)
+- `aimem_query <search>` - Search code, conversations, decisions, commits (type: all|structures|conversations|decisions|commits)
 - `aimem_verify <name>` - Does this function/class/file exist?
 - `aimem_conversations <query>` - Search past conversation history (long-term memory)
-- `aimem_commits <query>` - Search git commit history
 
 ## Git Integration
 

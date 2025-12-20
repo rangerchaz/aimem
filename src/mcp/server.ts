@@ -18,8 +18,6 @@ import {
   searchFullConversations,
   findProjectForPath,
   searchCommits,
-  getRecentCommits,
-  getCommitById,
 } from '../db/index.js';
 
 export async function startMcpServer(): Promise<void> {
@@ -40,12 +38,12 @@ export async function startMcpServer(): Promise<void> {
     tools: [
       {
         name: 'aimem_query',
-        description: 'Search code, conversations, and decisions',
+        description: 'Search code, conversations, decisions, and commits',
         inputSchema: {
           type: 'object',
           properties: {
             query: { type: 'string', description: 'Function name, class name, or keyword' },
-            type: { type: 'string', enum: ['all', 'structures', 'conversations', 'decisions'], default: 'all' },
+            type: { type: 'string', enum: ['all', 'structures', 'conversations', 'decisions', 'commits'], default: 'all' },
             limit: { type: 'number', default: 10 },
           },
           required: ['query'],
@@ -75,17 +73,6 @@ export async function startMcpServer(): Promise<void> {
           },
         },
       },
-      {
-        name: 'aimem_commits',
-        description: 'Search git commit history',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string', description: 'Search commit messages' },
-            limit: { type: 'number', default: 10 },
-          },
-        },
-      },
     ],
   }));
 
@@ -100,7 +87,7 @@ export async function startMcpServer(): Promise<void> {
           const type = (args?.type as string) || 'all';
           const limit = (args?.limit as number) || 10;
 
-          const results: { structures?: unknown[]; conversations?: unknown[]; decisions?: unknown[] } = {};
+          const results: { structures?: unknown[]; conversations?: unknown[]; decisions?: unknown[]; commits?: unknown[] } = {};
 
           if (type === 'all' || type === 'structures') {
             const structures = searchStructures(query, limit);
@@ -162,6 +149,17 @@ export async function startMcpServer(): Promise<void> {
             }
 
             results.decisions = decisions.slice(0, limit);
+          }
+
+          if (type === 'all' || type === 'commits') {
+            const project = findProjectForPath(process.cwd());
+            const commits = searchCommits(query, limit, project?.id);
+            results.commits = commits.map(c => ({
+              hash: c.short_hash || c.hash.slice(0, 7),
+              author: c.author_name,
+              date: c.timestamp.split('T')[0],
+              subject: c.subject,
+            }));
           }
 
           return {
@@ -262,46 +260,6 @@ export async function startMcpServer(): Promise<void> {
                 count: results.length,
                 conversations: results,
               }, null, 2),
-            }],
-          };
-        }
-
-        case 'aimem_commits': {
-          const query = args?.query as string | undefined;
-          const limit = (args?.limit as number) || 10;
-
-          const cwd = process.cwd();
-          const project = findProjectForPath(cwd);
-          const projectId = project?.id;
-
-          let commits;
-          if (query) {
-            commits = searchCommits(query, limit, projectId);
-          } else if (projectId) {
-            commits = getRecentCommits(projectId, limit);
-          } else {
-            return {
-              content: [{ type: 'text', text: 'Please provide a query or run from within a project' }],
-            };
-          }
-
-          if (commits.length === 0) {
-            return {
-              content: [{ type: 'text', text: query ? `No commits found matching: ${query}` : 'No commits in database. Run `aimem git import` first.' }],
-            };
-          }
-
-          const results = commits.map(c => ({
-            hash: c.short_hash || c.hash.slice(0, 7),
-            author: c.author_name,
-            date: c.timestamp.split('T')[0],
-            subject: c.subject,
-          }));
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({ count: results.length, commits: results }, null, 2),
             }],
           };
         }
