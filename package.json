@@ -1,5 +1,5 @@
 {
-  "name": "aimem",
+  "name": "@rangerchaz/aimem",
   "version": "0.1.0",
   "description": "Local memory system for AI coding assistants",
   "type": "module",
@@ -25,11 +25,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chadcox/aimem.git"
+    "url": "git+https://github.com/rangerchaz/aimem.git"
   },
-  "homepage": "https://github.com/chadcox/aimem#readme",
+  "homepage": "https://github.com/rangerchaz/aimem#readme",
   "bugs": {
-    "url": "https://github.com/chadcox/aimem/issues"
+    "url": "https://github.com/rangerchaz/aimem/issues"
   },
   "files": [
     "dist",

@@ -189,8 +189,6 @@ export class AimemProxy {
         entities: e.mentionedEntities,
       }));
 
-      if (extractions.length === 0) return;
-
       const db = getDb();
       const now = new Date().toISOString();
 

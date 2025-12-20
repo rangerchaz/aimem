@@ -276,9 +276,6 @@ export HTTPS_PROXY=http://localhost:${port}
 `;
   }
 
-  // Fallback for apps that don't respect NODE_EXTRA_CA_CERTS
-  envBlock += `export NODE_TLS_REJECT_UNAUTHORIZED=0
-`;
 
   try {
     let content = '';
@@ -430,8 +427,6 @@ ${aimemPath} start --port ${port}
 export HTTP_PROXY=http://localhost:${port}
 export HTTPS_PROXY=http://localhost:${port}
 export NODE_EXTRA_CA_CERTS="${certPath}"
-# Fallback for apps that don't respect NODE_EXTRA_CA_CERTS:
-export NODE_TLS_REJECT_UNAUTHORIZED=0
 `;
   const profileSnippetPath = join(aimemDir, 'proxy-env.sh');
   writeFileSync(profileSnippetPath, profileAdditions);

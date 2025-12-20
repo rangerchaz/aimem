@@ -82,17 +82,7 @@ No cloud. No accounts. Everything stays on your machine.
 ## Installation
 
 ```bash
-# Clone and build
-git clone https://github.com/chadcox/aimem.git
-cd aimem
-npm install
-npm run build
-
-# Install globally
-npm link
-
-# Verify
-aimem --version
+npm install -g @rangerchaz/aimem
 ```
 
 Requires Node.js 18+. No Python required.
@@ -142,7 +132,7 @@ Add to your config:
   "mcpServers": {
     "aimem": {
       "command": "aimem",
-      "args": ["mcp"]
+      "args": ["mcp-serve"]
     }
   }
 }
@@ -373,8 +363,14 @@ No cloud. No accounts. Code never leaves your machine.
 ## Development
 
 ```bash
-npm install        # Install dependencies
-npm run build      # Build
+# Install from source
+git clone https://github.com/rangerchaz/aimem.git
+cd aimem
+npm install
+npm run build
+npm link           # Install globally from source
+
+# Development commands
 npm run dev        # Watch mode
 npm test           # Run tests
 ```
