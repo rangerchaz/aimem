@@ -37,68 +37,38 @@ export async function startMcpServer(): Promise<void> {
     tools: [
       {
         name: 'aimem_query',
-        description: 'Search for code structures (functions, classes, etc.) and past conversations. Use this to find relevant context about the codebase.',
+        description: 'Search code, conversations, and decisions',
         inputSchema: {
           type: 'object',
           properties: {
-            query: {
-              type: 'string',
-              description: 'Search query - can be a function name, class name, or keyword',
-            },
-            type: {
-              type: 'string',
-              enum: ['all', 'structures', 'conversations', 'decisions'],
-              description: 'What to search: all, structures, conversations, or decisions',
-              default: 'all',
-            },
-            limit: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 10,
-            },
+            query: { type: 'string', description: 'Function name, class name, or keyword' },
+            type: { type: 'string', enum: ['all', 'structures', 'conversations', 'decisions'], default: 'all' },
+            limit: { type: 'number', default: 10 },
           },
           required: ['query'],
         },
       },
       {
         name: 'aimem_verify',
-        description: 'Verify that a code entity (function, class, file) exists in the codebase. Use this to check claims before making them.',
+        description: 'Check if a function, class, or file exists',
         inputSchema: {
           type: 'object',
           properties: {
-            name: {
-              type: 'string',
-              description: 'Name of the function or class to verify',
-            },
-            type: {
-              type: 'string',
-              enum: ['structure', 'file'],
-              description: 'Type of entity to verify',
-              default: 'structure',
-            },
+            name: { type: 'string', description: 'Name to verify' },
+            type: { type: 'string', enum: ['structure', 'file'], default: 'structure' },
           },
           required: ['name'],
         },
       },
       {
         name: 'aimem_conversations',
-        description: 'Search and retrieve full conversation history from past Claude/AI sessions. Use this for long-term memory - finding past discussions, decisions, and context about the project.',
+        description: 'Search past AI conversation history',
         inputSchema: {
           type: 'object',
           properties: {
-            query: {
-              type: 'string',
-              description: 'Search query to find relevant conversations (keywords, topics, or questions)',
-            },
-            id: {
-              type: 'number',
-              description: 'Get a specific conversation by ID',
-            },
-            limit: {
-              type: 'number',
-              description: 'Maximum number of conversations to return',
-              default: 5,
-            },
+            query: { type: 'string', description: 'Search keywords' },
+            id: { type: 'number', description: 'Get by ID' },
+            limit: { type: 'number', default: 5 },
           },
         },
       },
