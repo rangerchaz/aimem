@@ -41,6 +41,7 @@ export function getDb(): Database.Database {
     const dbPath = join(resolveDataDir(), 'aimem.db');
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
     applyMigrations(db);

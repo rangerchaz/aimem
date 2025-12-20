@@ -116,6 +116,9 @@ After restart, Claude Code will have MCP tools available to query your project's
 
 ### For Claude Desktop Users
 
+Claude Desktop can **query** aimem but conversations are **not captured** (Electron apps don't reliably use HTTP_PROXY). This is fine - Claude Desktop can still search decisions and context from Claude Code sessions.
+
+**macOS/Linux:**
 ```bash
 # 1. Index your project
 cd /path/to/your/project
@@ -123,10 +126,9 @@ aimem init
 
 # 2. Add MCP server to Claude Desktop config
 # macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-# Windows: %APPDATA%\Claude\claude_desktop_config.json
+# Linux: ~/.config/Claude/claude_desktop_config.json
 ```
 
-Add to your config:
 ```json
 {
   "mcpServers": {
@@ -138,9 +140,29 @@ Add to your config:
 }
 ```
 
-Restart Claude Desktop. The MCP tools will be available for querying your project's memory.
+**Windows (with WSL):**
 
-> **Note:** Proxy capture may not work with Claude Desktop (depends on Electron proxy settings). MCP query tools work regardless.
+Create a wrapper script `C:\Users\<user>\aimem-mcp.sh`:
+```bash
+#!/bin/bash
+export PATH="/home/<user>/.nvm/versions/node/<version>/bin:$PATH"
+export AIMEM_DATA_DIR="/home/<user>/.aimem"
+exec aimem mcp-serve
+```
+
+Then configure Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "aimem": {
+      "command": "wsl",
+      "args": ["bash", "/mnt/c/Users/<user>/aimem-mcp.sh"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop. The MCP tools will be available for querying your project's memory.
 
 ### For Other Tools (Cursor, Continue.dev, etc.)
 
