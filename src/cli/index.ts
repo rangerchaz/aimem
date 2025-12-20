@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { createRequire } from 'module';
 import { initCommand } from './commands/init.js';
 import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
@@ -12,12 +13,15 @@ import { importCommand } from './commands/import.js';
 import { visualizeCommand } from './commands/visualize.js';
 import { gitCommand } from './commands/git.js';
 
+const require = createRequire(import.meta.url);
+const packageJson = require('../../package.json');
+
 const program = new Command();
 
 program
   .name('aimem')
   .description('Local memory system for AI coding assistants')
-  .version('0.1.0');
+  .version(packageJson.version);
 
 program
   .command('init [path]')
