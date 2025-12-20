@@ -2,8 +2,8 @@ import Database from 'better-sqlite3';
 import { homedir } from 'os';
 import { join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
-import { SCHEMA } from './schema.js';
-import type { Project, File, Structure, Conversation, Link, Extraction, IndexStats } from '../types/index.js';
+import { SCHEMA, MIGRATIONS, COMMIT_LINKS_SCHEMA } from './schema.js';
+import type { Project, File, Structure, Conversation, Link, Extraction, IndexStats, Commit, CommitLink } from '../types/index.js';
 
 const DATA_DIR = join(homedir(), '.aimem');
 const DB_PATH = join(DATA_DIR, 'aimem.db');
@@ -20,6 +20,19 @@ export function ensureDataDir(): void {
   }
 }
 
+function applyMigrations(database: Database.Database): void {
+  // Apply each migration, ignoring errors for already-applied ones
+  for (const migration of MIGRATIONS) {
+    try {
+      database.exec(migration);
+    } catch {
+      // Column already exists or other expected error
+    }
+  }
+  // Apply commit_links schema
+  database.exec(COMMIT_LINKS_SCHEMA);
+}
+
 export function getDb(): Database.Database {
   if (!db) {
     ensureDataDir();
@@ -27,6 +40,7 @@ export function getDb(): Database.Database {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
+    applyMigrations(db);
   }
   return db;
 }
@@ -393,6 +407,169 @@ export function getAllProjectExtractions(projectId: number): Extraction[] {
     SELECT e.* FROM extractions e
     JOIN conversations c ON e.conversation_id = c.id
     WHERE c.project_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(projectId) as Extraction[];
+}
+
+// ============ Git Operations ============
+
+// Commit operations
+export function upsertCommit(
+  projectId: number,
+  hash: string,
+  shortHash: string | null,
+  authorName: string | null,
+  authorEmail: string | null,
+  timestamp: string,
+  subject: string,
+  body: string | null,
+  parentHashes: string[] = []
+): Commit {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO commits (project_id, hash, short_hash, author_name, author_email, timestamp, subject, body, parent_hashes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id, hash) DO UPDATE SET
+      short_hash = excluded.short_hash,
+      author_name = excluded.author_name,
+      author_email = excluded.author_email,
+      subject = excluded.subject,
+      body = excluded.body,
+      parent_hashes = excluded.parent_hashes
+    RETURNING *
+  `);
+  return stmt.get(projectId, hash, shortHash, authorName, authorEmail, timestamp, subject, body, JSON.stringify(parentHashes)) as Commit;
+}
+
+export function getCommitByHash(projectId: number, hash: string): Commit | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM commits WHERE project_id = ? AND hash = ?').get(projectId, hash) as Commit | undefined;
+}
+
+export function getCommitById(id: number): Commit | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM commits WHERE id = ?').get(id) as Commit | undefined;
+}
+
+export function searchCommits(query: string, limit = 20, projectId?: number): Commit[] {
+  const db = getDb();
+  if (projectId) {
+    return db.prepare(`
+      SELECT c.* FROM commits c
+      JOIN commits_fts fts ON c.id = fts.rowid
+      WHERE commits_fts MATCH ? AND c.project_id = ?
+      ORDER BY rank
+      LIMIT ?
+    `).all(query, projectId, limit) as Commit[];
+  }
+  return db.prepare(`
+    SELECT c.* FROM commits c
+    JOIN commits_fts fts ON c.id = fts.rowid
+    WHERE commits_fts MATCH ?
+    ORDER BY rank
+    LIMIT ?
+  `).all(query, limit) as Commit[];
+}
+
+export function getRecentCommits(projectId: number, limit = 50): Commit[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM commits WHERE project_id = ?
+    ORDER BY timestamp DESC LIMIT ?
+  `).all(projectId, limit) as Commit[];
+}
+
+// Commit link operations
+export function createCommitLink(
+  commitId: number,
+  targetType: CommitLink['target_type'],
+  targetId: number,
+  linkType: CommitLink['link_type']
+): CommitLink | undefined {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO commit_links (commit_id, target_type, target_id, link_type)
+    VALUES (?, ?, ?, ?)
+    RETURNING *
+  `);
+  return stmt.get(commitId, targetType, targetId, linkType) as CommitLink | undefined;
+}
+
+export function getCommitLinks(commitId: number): CommitLink[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM commit_links WHERE commit_id = ?').all(commitId) as CommitLink[];
+}
+
+export function getLinksToCommit(targetType: CommitLink['target_type'], targetId: number): CommitLink[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM commit_links WHERE target_type = ? AND target_id = ?').all(targetType, targetId) as CommitLink[];
+}
+
+export function getCommitsForStructure(structureId: number): Commit[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT c.* FROM commits c
+    JOIN commit_links cl ON c.id = cl.commit_id
+    WHERE cl.target_type = 'structure' AND cl.target_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(structureId) as Commit[];
+}
+
+export function getCommitsForExtraction(extractionId: number): Commit[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT c.* FROM commits c
+    JOIN commit_links cl ON c.id = cl.commit_id
+    WHERE cl.target_type = 'extraction' AND cl.target_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(extractionId) as Commit[];
+}
+
+// Update structure authorship
+export function updateStructureAuthorship(
+  structureId: number,
+  author: string | null,
+  authorEmail: string | null,
+  commitHash: string | null
+): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE structures SET
+      last_author = ?,
+      last_author_email = ?,
+      last_commit_hash = ?
+    WHERE id = ?
+  `).run(author, authorEmail, commitHash, structureId);
+}
+
+// Get uncommitted decisions (extractions created since last commit)
+export function getUncommittedExtractions(projectId: number, sinceCommitHash?: string): Extraction[] {
+  const db = getDb();
+
+  if (sinceCommitHash) {
+    // Get extractions created after the specified commit's timestamp
+    return db.prepare(`
+      SELECT e.* FROM extractions e
+      JOIN conversations c ON e.conversation_id = c.id
+      WHERE c.project_id = ?
+        AND c.timestamp > (
+          SELECT timestamp FROM commits WHERE project_id = ? AND hash = ?
+        )
+        AND e.id NOT IN (
+          SELECT target_id FROM commit_links WHERE target_type = 'extraction'
+        )
+      ORDER BY c.timestamp DESC
+    `).all(projectId, projectId, sinceCommitHash) as Extraction[];
+  }
+
+  // Get all extractions not linked to any commit
+  return db.prepare(`
+    SELECT e.* FROM extractions e
+    JOIN conversations c ON e.conversation_id = c.id
+    WHERE c.project_id = ?
+      AND e.id NOT IN (
+        SELECT target_id FROM commit_links WHERE target_type = 'extraction'
+      )
     ORDER BY c.timestamp DESC
   `).all(projectId) as Extraction[];
 }

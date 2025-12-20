@@ -2,12 +2,13 @@ import { readFileSync, statSync } from 'fs';
 import { join, extname, relative } from 'path';
 import { createHash } from 'crypto';
 import { glob } from 'glob';
-import { upsertFile, deleteFileStructures, insertStructure, getProjectFiles, deleteFile, getStructuresByName, createLink, getDb } from '../db/index.js';
+import { upsertFile, deleteFileStructures, insertStructure, getProjectFiles, deleteFile, getStructuresByName, createLink, getDb, updateStructureAuthorship } from '../db/index.js';
 import type { Parser, ParsedStructure } from './parsers/base.js';
 import { javascriptParser } from './parsers/javascript.js';
 import { pythonParser } from './parsers/python.js';
 import { rubyParser } from './parsers/ruby.js';
 import { goParser } from './parsers/go.js';
+import { isGitRepo, getBlameForLines } from '../git/index.js';
 
 // Store pending calls to resolve after all structures are indexed
 interface PendingCall {
@@ -71,12 +72,18 @@ async function getProjectFilePaths(projectPath: string): Promise<string[]> {
   return files;
 }
 
+interface IndexFileOptions {
+  pendingCalls?: PendingCall[];
+  trackBlame?: boolean;
+}
+
 export async function indexFile(
   projectId: number,
   projectPath: string,
   relativePath: string,
-  pendingCalls?: PendingCall[]
+  options: IndexFileOptions = {}
 ): Promise<number> {
+  const { pendingCalls, trackBlame = false } = options;
   const fullPath = join(projectPath, relativePath);
   const parser = getParser(fullPath);
 
@@ -96,6 +103,7 @@ export async function indexFile(
 
     // Parse and store structures
     const structures = parser.parse(content, relativePath);
+    const insertedStructures: Array<{ id: number; lineStart: number }> = [];
 
     for (const s of structures) {
       const inserted = insertStructure(
@@ -109,6 +117,8 @@ export async function indexFile(
         s.metadata
       );
 
+      insertedStructures.push({ id: inserted.id, lineStart: s.lineStart });
+
       // Collect pending calls to resolve later
       if (pendingCalls && s.calls && s.calls.length > 0) {
         for (const calledName of s.calls) {
@@ -120,6 +130,21 @@ export async function indexFile(
       }
     }
 
+    // Track git blame for structures if enabled
+    if (trackBlame && insertedStructures.length > 0 && isGitRepo(projectPath)) {
+      try {
+        for (const s of insertedStructures) {
+          const blameData = await getBlameForLines(projectPath, relativePath, s.lineStart, s.lineStart);
+          if (blameData.length > 0) {
+            const blame = blameData[0];
+            updateStructureAuthorship(s.id, blame.author, blame.authorEmail, blame.hash);
+          }
+        }
+      } catch {
+        // Blame failed, continue without it
+      }
+    }
+
     return structures.length;
   } catch (err) {
     // File might have been deleted or unreadable
@@ -128,7 +153,16 @@ export async function indexFile(
   }
 }
 
-export async function indexProject(projectId: number, projectPath: string): Promise<{ files: number; structures: number; links: number }> {
+interface IndexProjectOptions {
+  trackBlame?: boolean;
+}
+
+export async function indexProject(
+  projectId: number,
+  projectPath: string,
+  options: IndexProjectOptions = {}
+): Promise<{ files: number; structures: number; links: number }> {
+  const { trackBlame = false } = options;
   const filePaths = await getProjectFilePaths(projectPath);
   const pendingCalls: PendingCall[] = [];
 
@@ -148,7 +182,7 @@ export async function indexProject(projectId: number, projectPath: string): Prom
   `).run(projectId);
 
   for (const relativePath of filePaths) {
-    const count = await indexFile(projectId, projectPath, relativePath, pendingCalls);
+    const count = await indexFile(projectId, projectPath, relativePath, { pendingCalls, trackBlame });
     if (count > 0) {
       indexedFiles++;
       totalStructures += count;

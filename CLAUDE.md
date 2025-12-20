@@ -44,16 +44,19 @@ Context retrieval: MCP tools query SQLite on-demand
 | `src/indexer/` | Code parser that extracts functions/classes/methods from source files |
 | `src/indexer/parsers/` | Language-specific parsers (JS/TS, Python, Ruby, Go) |
 | `src/extractor/` | Decision extraction from conversation text |
-| `src/cli/commands/` | CLI commands (init, start, stop, status, query, setup, import, visualize) |
+| `src/cli/commands/` | CLI commands (init, start, stop, status, query, setup, import, visualize, git) |
+| `src/git/` | Git integration: commit parsing, blame tracking, hooks |
 | `src/visualize/` | Interactive HTML dashboard using Cytoscape.js and D3.js |
 
 ### Database Schema (SQLite)
 
 - **projects**: Indexed codebases (path, name)
 - **files**: Source files with content hashes
-- **structures**: Functions, classes, methods with signatures and line numbers
+- **structures**: Functions, classes, methods with signatures, line numbers, and git authorship
 - **conversations**: Stored LLM conversations (model, tool, summary, raw_content)
 - **extractions**: Decisions/rejections extracted from conversations
+- **commits**: Git commit history with FTS search
+- **commit_links**: Links between commits and structures/extractions
 - **links**: Graph edges connecting entities (extraction→structure, structure→structure)
 
 ### Proxy Architecture
@@ -73,7 +76,24 @@ Before claiming something isn't implemented or needs to be built:
 1. Query `aimem_query <topic> type=decisions` to check past decisions
 2. Query `aimem_verify <name>` to check if a function/class exists
 
-Available aimem tools (v2.0 - lean):
+Available aimem MCP tools:
 - `aimem_query <search>` - Search code, conversations, and decisions (type: all|structures|conversations|decisions)
 - `aimem_verify <name>` - Does this function/class/file exist?
 - `aimem_conversations <query>` - Search past conversation history (long-term memory)
+- `aimem_commits <query>` - Search git commit history
+
+## Git Integration
+
+```bash
+aimem git import [--limit N]     # Import commit history into aimem
+aimem git link [--auto]          # Link recent decisions to HEAD commit
+aimem git hooks install          # Install post-commit hook for auto-linking
+aimem git hooks status           # Check installed hooks
+aimem git search <query>         # Search commit messages
+aimem git blame <file>           # Show blame with aimem context
+```
+
+The git integration tracks:
+- Commit history with FTS search on messages
+- Git authorship on code structures (who last modified each function)
+- Links between AI decisions and the commits where they were applied

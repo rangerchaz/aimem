@@ -17,6 +17,9 @@ import {
   getConversationById,
   searchFullConversations,
   findProjectForPath,
+  searchCommits,
+  getRecentCommits,
+  getCommitById,
 } from '../db/index.js';
 
 export async function startMcpServer(): Promise<void> {
@@ -72,6 +75,17 @@ export async function startMcpServer(): Promise<void> {
           },
         },
       },
+      {
+        name: 'aimem_commits',
+        description: 'Search git commit history',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search commit messages' },
+            limit: { type: 'number', default: 10 },
+          },
+        },
+      },
     ],
   }));
 
@@ -96,6 +110,8 @@ export async function startMcpServer(): Promise<void> {
               file: getFile(s.file_id)?.path,
               line: s.line_start,
               signature: s.signature,
+              author: s.last_author || undefined,
+              commit: s.last_commit_hash?.slice(0, 7) || undefined,
             }));
           }
 
@@ -246,6 +262,46 @@ export async function startMcpServer(): Promise<void> {
                 count: results.length,
                 conversations: results,
               }, null, 2),
+            }],
+          };
+        }
+
+        case 'aimem_commits': {
+          const query = args?.query as string | undefined;
+          const limit = (args?.limit as number) || 10;
+
+          const cwd = process.cwd();
+          const project = findProjectForPath(cwd);
+          const projectId = project?.id;
+
+          let commits;
+          if (query) {
+            commits = searchCommits(query, limit, projectId);
+          } else if (projectId) {
+            commits = getRecentCommits(projectId, limit);
+          } else {
+            return {
+              content: [{ type: 'text', text: 'Please provide a query or run from within a project' }],
+            };
+          }
+
+          if (commits.length === 0) {
+            return {
+              content: [{ type: 'text', text: query ? `No commits found matching: ${query}` : 'No commits in database. Run `aimem git import` first.' }],
+            };
+          }
+
+          const results = commits.map(c => ({
+            hash: c.short_hash || c.hash.slice(0, 7),
+            author: c.author_name,
+            date: c.timestamp.split('T')[0],
+            subject: c.subject,
+          }));
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({ count: results.length, commits: results }, null, 2),
             }],
           };
         }

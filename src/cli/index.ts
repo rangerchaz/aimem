@@ -10,6 +10,7 @@ import { mcpServeCommand } from './commands/mcp-serve.js';
 import { setupCommand } from './commands/setup.js';
 import { importCommand } from './commands/import.js';
 import { visualizeCommand } from './commands/visualize.js';
+import { gitCommand } from './commands/git.js';
 
 const program = new Command();
 
@@ -119,5 +120,8 @@ program
       port: options.port ? parseInt(options.port, 10) : undefined,
     });
   });
+
+// Git integration commands
+program.addCommand(gitCommand);
 
 program.parse();
