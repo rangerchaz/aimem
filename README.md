@@ -1,12 +1,19 @@
 # aimem
 
-**Memory for AI coding assistants.**
+**Your AI assistant finally remembers.**
 
-Every new session, your AI assistant forgets everything—architectural decisions, rejected approaches, why you built things a certain way. You waste time re-explaining context.
+Every session starts fresh—decisions forgotten, context lost, explanations repeated.
 
-aimem fixes this. It captures your LLM conversations, extracts decisions, indexes your codebase, and makes it all searchable via MCP tools. Next session, ask "why did we use X?" and get the answer.
+aimem fixes this:
 
-**Your AI assistant finally remembers what you talked about yesterday.**
+- Captures LLM conversations via local proxy
+- Extracts decisions automatically
+- Indexes your codebase
+- Searchable via MCP tools or CLI
+
+*"Why did we choose Redis?"* → Get the answer from last week's chat.
+
+No cloud. No accounts. Everything stays on your machine.
 
 ## v2.0 - Lean Architecture
 
