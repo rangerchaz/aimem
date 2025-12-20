@@ -116,6 +116,20 @@ export function generateDashboardHTML(data: VisualizationData): string {
       display: inline-block;
     }
 
+    .visualize-search-btn {
+      background: #e94560;
+      border: 1px solid #e94560;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .visualize-search-btn:hover {
+      background: #ff6b8a;
+    }
+
     .fullscreen-btn {
       background: #0f3460;
       border: 1px solid #1a1a2e;
@@ -826,6 +840,380 @@ export function generateDashboardHTML(data: VisualizationData): string {
       max-width: 300px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
+
+    /* ============================================
+       New View Styles
+       ============================================ */
+
+    /* Custom view containers */
+    .custom-view {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #1a1a2e;
+    }
+
+    .custom-view.active {
+      display: block;
+    }
+
+    /* Code Smells View */
+    .smells-summary {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .smell-stat {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px 24px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .smell-stat .count {
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .smell-stat .label {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .smell-stat.high .count { color: #ef4444; }
+    .smell-stat.medium .count { color: #f59e0b; }
+    .smell-stat.low .count { color: #22c55e; }
+
+    .smell-filters {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .smell-filter-btn {
+      background: #0f3460;
+      border: 1px solid #1a1a2e;
+      color: #888;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .smell-filter-btn:hover { color: #ccc; }
+    .smell-filter-btn.active { background: #e94560; color: white; border-color: #e94560; }
+
+    .smell-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .smell-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #16213e;
+      border-radius: 6px;
+      cursor: pointer;
+      border-left: 4px solid transparent;
+    }
+
+    .smell-item:hover { background: #1e2a4a; }
+    .smell-item.high { border-left-color: #ef4444; }
+    .smell-item.medium { border-left-color: #f59e0b; }
+    .smell-item.low { border-left-color: #22c55e; }
+
+    .smell-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      min-width: 100px;
+      text-align: center;
+    }
+
+    .smell-badge.large-file { background: #7c3aed; color: white; }
+    .smell-badge.long-function { background: #2563eb; color: white; }
+    .smell-badge.too-many-callers { background: #0891b2; color: white; }
+    .smell-badge.too-many-callees { background: #059669; color: white; }
+    .smell-badge.orphan { background: #6b7280; color: white; }
+
+    .smell-info { flex: 1; }
+    .smell-name { font-weight: 500; margin-bottom: 2px; }
+    .smell-desc { font-size: 12px; color: #888; }
+    .smell-metric { font-size: 14px; color: #e94560; font-weight: 500; }
+
+    /* Hotspots View */
+    .hotspots-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .hotspot-section {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .hotspot-section h3 {
+      font-size: 14px;
+      color: #e94560;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    .hotspot-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hotspot-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      background: #0f3460;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .hotspot-item:hover { background: #1a4a7a; }
+
+    .hotspot-rank {
+      width: 24px;
+      height: 24px;
+      background: #e94560;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .hotspot-info { flex: 1; min-width: 0; }
+    .hotspot-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hotspot-file { font-size: 11px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hotspot-value { font-size: 14px; color: #e94560; font-weight: 500; }
+
+    /* Gallery View */
+    .gallery-filters {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .gallery-card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .gallery-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .gallery-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .gallery-type-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .gallery-type-badge.decision { background: #16a34a; color: white; }
+    .gallery-type-badge.pattern { background: #0d9488; color: white; }
+    .gallery-type-badge.rejection { background: #dc2626; color: white; }
+
+    .gallery-timestamp {
+      font-size: 11px;
+      color: #666;
+      margin-left: auto;
+    }
+
+    .gallery-content {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #ccc;
+      margin-bottom: 12px;
+      max-height: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .gallery-card.expanded .gallery-content {
+      max-height: none;
+    }
+
+    .gallery-affected {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .gallery-code-chip {
+      padding: 4px 8px;
+      background: #0f3460;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    .gallery-code-chip:hover { background: #1a4a7a; color: #fff; }
+
+    /* Timeline View */
+    .timeline-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .timeline-scroll {
+      flex: 1;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 16px;
+    }
+
+    .timeline-track {
+      display: flex;
+      align-items: flex-end;
+      min-width: max-content;
+      padding: 0 20px;
+      height: 300px;
+      border-bottom: 2px solid #0f3460;
+      position: relative;
+    }
+
+    .timeline-entry {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 60px;
+      cursor: pointer;
+    }
+
+    .timeline-bar {
+      width: 40px;
+      background: #e94560;
+      border-radius: 4px 4px 0 0;
+      min-height: 20px;
+      transition: background 0.2s;
+    }
+
+    .timeline-entry:hover .timeline-bar { background: #ff6b8a; }
+
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      background: #e94560;
+      border-radius: 50%;
+      margin-top: 8px;
+      border: 2px solid #1a1a2e;
+    }
+
+    .timeline-date {
+      font-size: 10px;
+      color: #666;
+      margin-top: 8px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      max-height: 60px;
+      overflow: hidden;
+    }
+
+    .timeline-details {
+      margin-top: 20px;
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    /* Treemap View */
+    #treemap-container {
+      width: 100%;
+      height: calc(100% - 50px);
+      min-height: 400px;
+    }
+
+    .treemap-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .treemap-breadcrumb span {
+      color: #888;
+      cursor: pointer;
+    }
+
+    .treemap-breadcrumb span:hover { color: #e94560; }
+    .treemap-breadcrumb span.current { color: #eee; cursor: default; }
+
+    .treemap-node {
+      stroke: #1a1a2e;
+      stroke-width: 1px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .treemap-node:hover { opacity: 0.8; }
+
+    .treemap-label {
+      font-size: 11px;
+      fill: white;
+      pointer-events: none;
+      text-anchor: middle;
+    }
+
+    .treemap-tooltip {
+      position: absolute;
+      background: rgba(22, 33, 62, 0.95);
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
@@ -833,6 +1221,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
     <h1>aimem <span>Dashboard: ${escapeHtml(data.project.name)}</span></h1>
     <div class="search-box">
       <input type="text" id="search" placeholder="Search nodes...">
+      <button class="visualize-search-btn" id="visualize-search-btn" title="Visualize search results as graph" style="display: none;">Visualize</button>
       <button class="back-btn" id="back-btn" title="Go back">← Back</button>
       <div class="view-toggle">
         <button class="view-toggle-btn active" data-mode="visual">Visual</button>
@@ -848,6 +1237,11 @@ export function generateDashboardHTML(data: VisualizationData): string {
     <div class="tab" data-view="dependencies">Dependencies</div>
     <div class="tab" data-view="classes">Classes</div>
     <div class="tab" data-view="decisions">Decisions</div>
+    <div class="tab" data-view="smells">Code Smells</div>
+    <div class="tab" data-view="hotspots">Hotspots</div>
+    <div class="tab" data-view="gallery">Gallery</div>
+    <div class="tab" data-view="timeline">Timeline</div>
+    <div class="tab" data-view="treemap">Treemap</div>
   </div>
 
   <button class="exit-fullscreen" id="exit-fullscreen" style="display: none;">Exit Fullscreen (ESC)</button>
@@ -927,6 +1321,13 @@ export function generateDashboardHTML(data: VisualizationData): string {
       <div id="cy"></div>
       <div id="list-view"></div>
 
+      <!-- Custom Views (non-graph) -->
+      <div id="smells-view" class="custom-view"></div>
+      <div id="hotspots-view" class="custom-view"></div>
+      <div id="gallery-view" class="custom-view"></div>
+      <div id="timeline-view" class="custom-view"></div>
+      <div id="treemap-view" class="custom-view"></div>
+
       <!-- Legend -->
       <div class="legend" id="legend">
         <div class="legend-title">Legend</div>
@@ -961,6 +1362,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
         <div class="stat"><span class="stat-value">${data.stats.totalFiles}</span> files</div>
         <div class="stat"><span class="stat-value">${data.stats.totalLinks}</span> links</div>
         <div class="stat"><span class="stat-value">${data.stats.totalDecisions}</span> decisions</div>
+        <div class="stat"><span class="stat-value">${data.stats.totalConversations}</span> conversations</div>
       </div>
     </div>
 
@@ -979,6 +1381,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
   </div>
 
   <script id="viz-data" type="application/json">${jsonData}</script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
     // Visualization data - parse from JSON script tag to avoid escaping issues
     const vizData = JSON.parse(document.getElementById('viz-data').textContent);
@@ -995,6 +1398,11 @@ export function generateDashboardHTML(data: VisualizationData): string {
       dependencies: '<strong>Dependencies</strong> - File relationships. <em>Double-click</em> to see inside each file.',
       classes: '<strong>Classes</strong> - Your types and structures. <em>Double-click a class</em> to see its methods.',
       decisions: '<strong>Decisions</strong> - Why your code is the way it is. Connects decisions to the code they affect.',
+      smells: '<strong>Code Smells</strong> - Potential issues detected in your codebase. Filter by type or severity.',
+      hotspots: '<strong>Hotspots</strong> - The most complex and connected parts of your code. Focus refactoring efforts here.',
+      gallery: '<strong>Gallery</strong> - Browse all decisions, patterns, and rejections from AI conversations.',
+      timeline: '<strong>Timeline</strong> - See conversation activity over time. Click entries to see details.',
+      treemap: '<strong>Treemap</strong> - Hierarchical view of your codebase by size. Click to zoom into directories.',
     };
 
     // Store full graph data for focus mode filtering
@@ -1141,10 +1549,22 @@ export function generateDashboardHTML(data: VisualizationData): string {
       }
     ];
 
-    function initCytoscape(graphData) {
+    function destroyCy() {
       if (cy) {
+        cy.removeAllListeners();
         cy.destroy();
+        cy = null;
       }
+    }
+
+    function initCytoscape(graphData) {
+      destroyCy();
+
+      const container = document.getElementById('cy');
+      if (!container) return;
+
+      // Clear any previous content
+      container.innerHTML = '';
 
       // Ensure all nodes have a weight for sizing
       const nodesWithWeight = graphData.nodes.map(n => ({
@@ -1156,7 +1576,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
       }));
 
       cy = cytoscape({
-        container: document.getElementById('cy'),
+        container: container,
         elements: [...nodesWithWeight, ...graphData.edges],
         style: cyStyle,
         layout: { name: 'cose', animate: false, randomize: true },
@@ -1254,6 +1674,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
     }
 
     function runLayout() {
+      if (!cy) return;
       const layoutName = document.getElementById('layout-select').value;
       const nodeCount = cy.nodes(':visible').length;
 
@@ -1581,10 +2002,39 @@ export function generateDashboardHTML(data: VisualizationData): string {
         flowModeGroup.style.display = 'none';
       }
 
+      // Hide all custom views
+      const customViews = ['smells', 'hotspots', 'gallery', 'timeline', 'treemap'];
+      customViews.forEach(v => {
+        const el = document.getElementById(v + '-view');
+        if (el) el.classList.remove('active');
+      });
+
+      // Show/hide cy and list-view based on view type
+      const isCustomView = customViews.includes(view);
+      document.getElementById('cy').style.display = isCustomView ? 'none' : 'block';
+      document.getElementById('list-view').style.display = isCustomView ? 'none' : (currentViewMode === 'list' ? 'block' : 'none');
+      document.getElementById('legend').style.display = isCustomView ? 'none' : 'block';
+
+      // Handle custom views
+      if (isCustomView) {
+        destroyCy();
+        const customViewEl = document.getElementById(view + '-view');
+        if (customViewEl) customViewEl.classList.add('active');
+
+        if (view === 'smells') renderSmellsView();
+        else if (view === 'hotspots') renderHotspotsView();
+        else if (view === 'gallery') renderGalleryView();
+        else if (view === 'timeline') renderTimelineView();
+        else if (view === 'treemap') renderTreemapView();
+
+        clearDetails();
+        return;
+      }
+
       // Special handling for call graph - focus mode
       if (view === 'callGraph') {
         fullCallGraphData = vizData.graphs.callGraph;
-        if (cy) cy.destroy();
+        destroyCy();
 
         // Find entry points: functions that call others but aren't called themselves
         const entryPoints = findEntryPoints();
@@ -1616,7 +2066,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
       if (graphData && (graphData.nodes.length > 0 || graphData.edges.length > 0)) {
         initCytoscape(graphData);
       } else {
-        if (cy) cy.destroy();
+        destroyCy();
         document.getElementById('cy').innerHTML = \`
           <div class="empty-state">
             <h3>No data</h3>
@@ -1957,7 +2407,7 @@ export function generateDashboardHTML(data: VisualizationData): string {
     }
 
     function applyFilters() {
-      if (!cy) return;
+      if (!cy || cy.destroyed()) return;
 
       const filters = {
         function: document.getElementById('filter-function').checked,
@@ -2088,8 +2538,13 @@ export function generateDashboardHTML(data: VisualizationData): string {
       });
     }
 
+    // Track last search matches for visualization
+    let lastSearchMatches = [];
+    let lastSearchQuery = '';
+
     function searchNodes(query) {
       const searchInput = document.getElementById('search');
+      const visualizeBtn = document.getElementById('visualize-search-btn');
 
       if (!query) {
         // Reset visual view
@@ -2106,13 +2561,29 @@ export function generateDashboardHTML(data: VisualizationData): string {
             section.style.display = '';
           });
         }
+        // Hide visualize button
+        lastSearchMatches = [];
+        lastSearchQuery = '';
+        if (visualizeBtn) visualizeBtn.style.display = 'none';
         return;
       }
 
       query = query.toLowerCase();
 
       // Get the data source for current view
-      const graphData = currentView === 'callGraph' ? fullCallGraphData : vizData.graphs[currentView];
+      // For custom views (smells, hotspots, etc.), use call graph data
+      const customViews = ['smells', 'hotspots', 'gallery', 'timeline', 'treemap'];
+      const isCustomView = customViews.includes(currentView);
+      let graphData;
+
+      if (currentView === 'callGraph') {
+        graphData = fullCallGraphData;
+      } else if (isCustomView) {
+        // Use call graph for searching from custom views
+        graphData = vizData.graphs.callGraph;
+      } else {
+        graphData = vizData.graphs[currentView];
+      }
 
       if (!graphData) return;
 
@@ -2123,6 +2594,15 @@ export function generateDashboardHTML(data: VisualizationData): string {
         const signature = (n.data.signature || '').toLowerCase();
         return label.includes(query) || file.includes(query) || signature.includes(query);
       });
+
+      // Store matches for visualization
+      lastSearchMatches = matches;
+      lastSearchQuery = query;
+
+      // Show/hide visualize button based on matches
+      if (visualizeBtn) {
+        visualizeBtn.style.display = matches.length >= 2 && matches.length <= 100 ? 'inline-block' : 'none';
+      }
 
       // Handle list view
       if (currentViewMode === 'list') {
@@ -2159,6 +2639,25 @@ export function generateDashboardHTML(data: VisualizationData): string {
           </div>
         \`;
         if (cy) cy.nodes().style('opacity', 0.2);
+        return;
+      }
+
+      // For custom views, show results in details panel with option to switch to call graph
+      if (isCustomView) {
+        const listHtml = matches.slice(0, 30).map(m =>
+          '<div style="padding: 6px 0; cursor: pointer; color: #e94560; border-bottom: 1px solid #0f3460;" onclick="switchView(\\'callGraph\\'); setTimeout(() => focusOnNode(\\'' + m.data.id + '\\'), 100);">' +
+          escapeHtml(m.data.label) +
+          '<span style="color: #666; font-size: 11px; margin-left: 8px;">' + (m.data.file ? m.data.file.split("/").pop() : '') + '</span></div>'
+        ).join('');
+
+        document.getElementById('details-content').innerHTML = \`
+          <div class="detail-row">
+            <div class="detail-label">\${matches.length} matches found</div>
+            <div style="font-size: 11px; color: #888; margin-bottom: 8px;">Click to view in Call Graph</div>
+            <div style="margin-top: 8px;">\${listHtml}</div>
+            \${matches.length > 30 ? '<div style="color: #666; margin-top: 8px;">...and ' + (matches.length - 30) + ' more</div>' : ''}
+          </div>
+        \`;
         return;
       }
 
@@ -2218,6 +2717,559 @@ export function generateDashboardHTML(data: VisualizationData): string {
       }
     }
 
+    // ============================================
+    // Custom View Render Functions
+    // ============================================
+
+    let currentSmellFilter = 'all';
+    let currentGalleryFilter = 'all';
+
+    function renderSmellsView() {
+      const container = document.getElementById('smells-view');
+      const smells = vizData.smells;
+
+      if (!smells || smells.smells.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No Code Smells Detected</h3><p>Your codebase looks clean!</p></div>';
+        return;
+      }
+
+      const filtered = currentSmellFilter === 'all'
+        ? smells.smells
+        : smells.smells.filter(s => s.type === currentSmellFilter || s.severity === currentSmellFilter);
+
+      container.innerHTML = \`
+        <div class="smells-summary">
+          <div class="smell-stat high">
+            <div class="count">\${smells.summary.high}</div>
+            <div class="label">High</div>
+          </div>
+          <div class="smell-stat medium">
+            <div class="count">\${smells.summary.medium}</div>
+            <div class="label">Medium</div>
+          </div>
+          <div class="smell-stat low">
+            <div class="count">\${smells.summary.low}</div>
+            <div class="label">Low</div>
+          </div>
+          <div class="smell-stat">
+            <div class="count">\${smells.smells.length}</div>
+            <div class="label">Total</div>
+          </div>
+        </div>
+
+        <div class="smell-filters">
+          <button class="smell-filter-btn \${currentSmellFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+          <button class="smell-filter-btn \${currentSmellFilter === 'high' ? 'active' : ''}" data-filter="high">High</button>
+          <button class="smell-filter-btn \${currentSmellFilter === 'medium' ? 'active' : ''}" data-filter="medium">Medium</button>
+          <button class="smell-filter-btn \${currentSmellFilter === 'low' ? 'active' : ''}" data-filter="low">Low</button>
+          <span style="margin-left: 16px; color: #444;">|</span>
+          <button class="smell-filter-btn \${currentSmellFilter === 'large-file' ? 'active' : ''}" data-filter="large-file">Large Files</button>
+          <button class="smell-filter-btn \${currentSmellFilter === 'long-function' ? 'active' : ''}" data-filter="long-function">Long Functions</button>
+          <button class="smell-filter-btn \${currentSmellFilter === 'orphan' ? 'active' : ''}" data-filter="orphan">Orphan Code</button>
+        </div>
+
+        <div class="smell-list">
+          \${filtered.map(smell => \`
+            <div class="smell-item \${smell.severity}" data-structure-id="\${smell.structureId || ''}" data-file="\${smell.filePath}">
+              <span class="smell-badge \${smell.type}">\${smell.type.replace(/-/g, ' ')}</span>
+              <div class="smell-info">
+                <div class="smell-name">\${escapeHtml(smell.name)}</div>
+                <div class="smell-desc">\${escapeHtml(smell.description)}</div>
+              </div>
+              <div class="smell-metric">\${smell.metric}</div>
+            </div>
+          \`).join('')}
+        </div>
+      \`;
+
+      // Add filter listeners
+      container.querySelectorAll('.smell-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentSmellFilter = btn.dataset.filter;
+          renderSmellsView();
+        });
+      });
+
+      // Add click listeners for smell items
+      container.querySelectorAll('.smell-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const structureId = item.dataset.structureId;
+          const filePath = item.dataset.file;
+          // Show details for the smell
+          showSmellDetails(structureId, filePath);
+        });
+      });
+    }
+
+    function showSmellDetails(structureId, filePath) {
+      // Find structure in vizData
+      let content = '<div class="detail-row"><div class="detail-label">File</div><div class="detail-value">' + escapeHtml(filePath) + '</div></div>';
+
+      if (structureId) {
+        // Find the structure in call graph or class graph
+        const allNodes = [...(vizData.graphs.callGraph?.nodes || []), ...(vizData.graphs.classes?.nodes || [])];
+        const node = allNodes.find(n => n.data.id === 'structure:' + structureId);
+        if (node) {
+          content += '<div class="detail-row"><div class="detail-label">Name</div><div class="detail-value">' + escapeHtml(node.data.label) + '</div></div>';
+          if (node.data.signature) {
+            content += '<div class="detail-row"><div class="detail-label">Signature</div><div class="detail-value" style="font-family: monospace;">' + escapeHtml(node.data.signature) + '</div></div>';
+          }
+          if (node.data.line) {
+            content += '<div class="detail-row"><div class="detail-label">Line</div><div class="detail-value">' + node.data.line + '</div></div>';
+          }
+        }
+      }
+
+      document.getElementById('details-content').innerHTML = content;
+      document.getElementById('details-panel').classList.add('visible');
+    }
+
+    function renderHotspotsView() {
+      const container = document.getElementById('hotspots-view');
+      const hotspots = vizData.hotspots;
+
+      if (!hotspots) {
+        container.innerHTML = '<div class="empty-state"><h3>No Hotspot Data</h3><p>Index your codebase first.</p></div>';
+        return;
+      }
+
+      function renderHotspotList(items, valueKey, valueLabel) {
+        if (!items || items.length === 0) return '<div style="color: #666; padding: 12px;">No data</div>';
+        return items.map((item, i) => \`
+          <div class="hotspot-item" data-id="\${item.id}" data-file="\${item.file}">
+            <div class="hotspot-rank">\${i + 1}</div>
+            <div class="hotspot-info">
+              <div class="hotspot-name">\${escapeHtml(item.name)}</div>
+              <div class="hotspot-file">\${escapeHtml(item.file?.split('/').pop() || item.file || '')}</div>
+            </div>
+            <div class="hotspot-value">\${item[valueKey] || 0} \${valueLabel}</div>
+          </div>
+        \`).join('');
+      }
+
+      container.innerHTML = \`
+        <div class="hotspots-grid">
+          <div class="hotspot-section">
+            <h3>Largest Functions</h3>
+            <div class="hotspot-list">
+              \${renderHotspotList(hotspots.largestFunctions, 'lines', 'lines')}
+            </div>
+          </div>
+          <div class="hotspot-section">
+            <h3>Most Connected</h3>
+            <div class="hotspot-list">
+              \${renderHotspotList(hotspots.mostConnected, 'total', 'connections')}
+            </div>
+          </div>
+          <div class="hotspot-section">
+            <h3>Densest Files</h3>
+            <div class="hotspot-list">
+              \${renderHotspotList(hotspots.densestFiles, 'structureCount', 'structures')}
+            </div>
+          </div>
+          <div class="hotspot-section">
+            <h3>Hub Functions (Most Called)</h3>
+            <div class="hotspot-list">
+              \${renderHotspotList(hotspots.hubFunctions, 'inbound', 'callers')}
+            </div>
+          </div>
+        </div>
+      \`;
+
+      // Add click listeners
+      container.querySelectorAll('.hotspot-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const id = item.dataset.id;
+          const file = item.dataset.file;
+          if (id && id !== '0') {
+            // Switch to call graph and focus
+            switchView('callGraph');
+            setTimeout(() => focusOnNode('structure:' + id), 100);
+          } else if (file) {
+            // Show file details
+            showSmellDetails(null, file);
+          }
+        });
+      });
+    }
+
+    function renderGalleryView() {
+      const container = document.getElementById('gallery-view');
+      const gallery = vizData.gallery;
+
+      if (!gallery || gallery.items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No Gallery Items</h3><p>Decisions, patterns, and rejections from AI conversations will appear here.</p></div>';
+        return;
+      }
+
+      const filtered = currentGalleryFilter === 'all'
+        ? gallery.items
+        : gallery.items.filter(item => item.type === currentGalleryFilter);
+
+      container.innerHTML = \`
+        <div class="gallery-filters">
+          <button class="smell-filter-btn \${currentGalleryFilter === 'all' ? 'active' : ''}" data-filter="all">All (\${gallery.items.length})</button>
+          <button class="smell-filter-btn \${currentGalleryFilter === 'decision' ? 'active' : ''}" data-filter="decision">Decisions (\${gallery.byType.decision})</button>
+          <button class="smell-filter-btn \${currentGalleryFilter === 'pattern' ? 'active' : ''}" data-filter="pattern">Patterns (\${gallery.byType.pattern})</button>
+          <button class="smell-filter-btn \${currentGalleryFilter === 'rejection' ? 'active' : ''}" data-filter="rejection">Rejections (\${gallery.byType.rejection})</button>
+        </div>
+
+        <div class="gallery-grid">
+          \${filtered.map(item => \`
+            <div class="gallery-card" data-id="\${item.id}">
+              <div class="gallery-card-header">
+                <span class="gallery-type-badge \${item.type}">\${item.type}</span>
+                <span class="gallery-timestamp">\${item.timestamp ? new Date(item.timestamp).toLocaleDateString() : ''}</span>
+              </div>
+              <div class="gallery-content">\${escapeHtml(item.content)}</div>
+              \${item.affectedCode.length > 0 ? \`
+                <div class="gallery-affected">
+                  \${item.affectedCode.slice(0, 5).map(code => \`
+                    <span class="gallery-code-chip" data-id="\${code.id}">\${escapeHtml(code.name)}</span>
+                  \`).join('')}
+                  \${item.affectedCode.length > 5 ? '<span class="gallery-code-chip">+' + (item.affectedCode.length - 5) + ' more</span>' : ''}
+                </div>
+              \` : ''}
+            </div>
+          \`).join('')}
+        </div>
+      \`;
+
+      // Add filter listeners
+      container.querySelectorAll('.smell-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentGalleryFilter = btn.dataset.filter;
+          renderGalleryView();
+        });
+      });
+
+      // Add expand card listeners
+      container.querySelectorAll('.gallery-card').forEach(card => {
+        card.addEventListener('click', () => {
+          card.classList.toggle('expanded');
+        });
+      });
+
+      // Add code chip listeners
+      container.querySelectorAll('.gallery-code-chip').forEach(chip => {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = chip.dataset.id;
+          if (id) {
+            switchView('callGraph');
+            setTimeout(() => focusOnNode('structure:' + id), 100);
+          }
+        });
+      });
+    }
+
+    function renderTimelineView() {
+      const container = document.getElementById('timeline-view');
+      const timeline = vizData.timeline;
+
+      if (!timeline || timeline.entries.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No Timeline Data</h3><p>AI conversation history will appear here.</p></div>';
+        return;
+      }
+
+      // Find max extraction count for scaling bars
+      const maxExtractions = Math.max(...timeline.entries.map(e => e.extractionCount || 1), 1);
+
+      container.innerHTML = \`
+        <div class="timeline-container">
+          <div class="timeline-header">
+            <div>
+              <strong>\${timeline.entries.length}</strong> conversations
+              \${timeline.dateRange ? \` from \${new Date(timeline.dateRange.start).toLocaleDateString()} to \${new Date(timeline.dateRange.end).toLocaleDateString()}\` : ''}
+            </div>
+          </div>
+          <div class="timeline-scroll">
+            <div class="timeline-track">
+              \${timeline.entries.map((entry, i) => {
+                const barHeight = Math.max(20, (entry.extractionCount / maxExtractions) * 200);
+                const date = new Date(entry.timestamp);
+                return \`
+                  <div class="timeline-entry" data-index="\${i}">
+                    <div class="timeline-bar" style="height: \${barHeight}px;" title="\${entry.extractionCount} extractions"></div>
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-date">\${date.toLocaleDateString()}</div>
+                  </div>
+                \`;
+              }).join('')}
+            </div>
+          </div>
+          <div class="timeline-details" id="timeline-details">
+            <div style="color: #666;">Click on a timeline entry to see details</div>
+          </div>
+        </div>
+      \`;
+
+      // Add click listeners
+      container.querySelectorAll('.timeline-entry').forEach(entry => {
+        entry.addEventListener('click', () => {
+          const index = parseInt(entry.dataset.index);
+          const item = timeline.entries[index];
+          showTimelineDetails(item);
+        });
+      });
+    }
+
+    function showTimelineDetails(entry) {
+      const detailsEl = document.getElementById('timeline-details');
+      if (!detailsEl) return;
+
+      const date = new Date(entry.timestamp);
+      detailsEl.innerHTML = \`
+        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+          <div>
+            <div style="color: #888; font-size: 12px;">Date</div>
+            <div>\${date.toLocaleString()}</div>
+          </div>
+          <div>
+            <div style="color: #888; font-size: 12px;">Model</div>
+            <div>\${entry.model || 'Unknown'}</div>
+          </div>
+          <div>
+            <div style="color: #888; font-size: 12px;">Tool</div>
+            <div>\${entry.tool || 'Unknown'}</div>
+          </div>
+          <div>
+            <div style="color: #888; font-size: 12px;">Extractions</div>
+            <div>\${entry.extractionCount}</div>
+          </div>
+        </div>
+        \${entry.summary ? '<div style="margin-top: 16px;"><div style="color: #888; font-size: 12px;">Summary</div><div>' + escapeHtml(entry.summary) + '</div></div>' : ''}
+        \${entry.touchedStructures.length > 0 ? \`
+          <div style="margin-top: 16px;">
+            <div style="color: #888; font-size: 12px;">Touched Structures</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+              \${entry.touchedStructures.map(s => \`<span class="gallery-code-chip" data-id="\${s.id}">\${escapeHtml(s.name)}</span>\`).join('')}
+            </div>
+          </div>
+        \` : ''}
+      \`;
+
+      // Add code chip listeners
+      detailsEl.querySelectorAll('.gallery-code-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const id = chip.dataset.id;
+          if (id) {
+            switchView('callGraph');
+            setTimeout(() => focusOnNode('structure:' + id), 100);
+          }
+        });
+      });
+    }
+
+    let treemapRoot = null;
+    let treemapCurrent = null;
+
+    function renderTreemapView() {
+      const container = document.getElementById('treemap-view');
+      const treemap = vizData.treemap;
+
+      if (!treemap || treemap.value === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No Treemap Data</h3><p>Index your codebase first.</p></div>';
+        return;
+      }
+
+      treemapRoot = treemap;
+      treemapCurrent = treemap;
+
+      container.innerHTML = \`
+        <div class="treemap-breadcrumb" id="treemap-breadcrumb">
+          <span class="current">root</span>
+        </div>
+        <div id="treemap-container"></div>
+      \`;
+
+      renderTreemap(treemap);
+    }
+
+    function renderTreemap(data) {
+      const containerEl = document.getElementById('treemap-container');
+      if (!containerEl) return;
+
+      const width = containerEl.clientWidth || 800;
+      const height = containerEl.clientHeight || 500;
+
+      // Clear previous
+      containerEl.innerHTML = '';
+
+      // If no children, show empty state
+      if (!data.children || data.children.length === 0) {
+        containerEl.innerHTML = '<div class="empty-state"><h3>No children</h3><p>This node has no child items to display.</p></div>';
+        return;
+      }
+
+      // D3 treemap layout - use children of current node, not leaves
+      const root = d3.hierarchy(data)
+        .sum(d => d.value || 0)
+        .sort((a, b) => b.value - a.value);
+
+      d3.treemap()
+        .size([width, height])
+        .padding(3)
+        .paddingTop(20)
+        .round(true)(root);
+
+      // Create SVG
+      const svg = d3.select(containerEl)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+      // Color scale for structure types
+      const typeColors = {
+        'function': '#2563eb',
+        'class': '#7c3aed',
+        'method': '#0891b2',
+        'interface': '#059669',
+        'type': '#d97706',
+        'variable': '#dc2626',
+        'file': '#475569',
+        'directory': '#334155',
+        'structure': '#2563eb',
+      };
+
+      // Get the direct children of root (depth 1)
+      const children = root.children || [];
+
+      const cell = svg.selectAll('g')
+        .data(children)
+        .join('g')
+        .attr('transform', d => \`translate(\${d.x0},\${d.y0})\`);
+
+      // Add background rect for each cell
+      cell.append('rect')
+        .attr('class', 'treemap-node')
+        .attr('width', d => Math.max(0, d.x1 - d.x0))
+        .attr('height', d => Math.max(0, d.y1 - d.y0))
+        .attr('fill', d => typeColors[d.data.structureType] || typeColors[d.data.type] || '#475569')
+        .attr('rx', 3)
+        .style('cursor', d => (d.data.children && d.data.children.length > 0) ? 'pointer' : 'default')
+        .on('click', (event, d) => {
+          event.stopPropagation();
+          if (d.data.children && d.data.children.length > 0) {
+            // Has children - zoom in
+            zoomToTreemapNode(d.data);
+          } else {
+            // No children - show details
+            showSmellDetails(null, d.data.path);
+          }
+        });
+
+      // Add header label at top of cell
+      cell.append('text')
+        .attr('class', 'treemap-label')
+        .attr('x', 6)
+        .attr('y', 14)
+        .attr('text-anchor', 'start')
+        .attr('fill', 'white')
+        .attr('font-size', '11px')
+        .attr('font-weight', '500')
+        .text(d => {
+          const w = d.x1 - d.x0;
+          if (w < 30) return '';
+          const name = d.data.name;
+          const maxChars = Math.floor((w - 12) / 6);
+          return name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name;
+        });
+
+      // Add value label below name
+      cell.append('text')
+        .attr('class', 'treemap-label')
+        .attr('x', d => (d.x1 - d.x0) / 2)
+        .attr('y', d => (d.y1 - d.y0) / 2 + 5)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'rgba(255,255,255,0.7)')
+        .attr('font-size', '10px')
+        .text(d => {
+          const w = d.x1 - d.x0;
+          const h = d.y1 - d.y0;
+          if (w < 50 || h < 40) return '';
+          return d.data.value + ' lines';
+        });
+
+      // Add click indicator for zoomable nodes
+      cell.append('text')
+        .attr('x', d => d.x1 - d.x0 - 8)
+        .attr('y', 14)
+        .attr('text-anchor', 'end')
+        .attr('fill', 'rgba(255,255,255,0.5)')
+        .attr('font-size', '10px')
+        .text(d => (d.data.children && d.data.children.length > 0) ? '→' : '');
+
+      // Add tooltips
+      cell.append('title')
+        .text(d => {
+          const hasChildren = d.data.children && d.data.children.length > 0;
+          return d.data.name + '\\n' +
+                 d.data.value + ' lines\\n' +
+                 (d.data.structureType || d.data.type) +
+                 (hasChildren ? '\\nClick to zoom in' : '');
+        });
+    }
+
+    function zoomToTreemapNode(node) {
+      if (!node.children || node.children.length === 0) return;
+
+      treemapCurrent = node;
+      updateTreemapBreadcrumb();
+      renderTreemap(node);
+    }
+
+    function updateTreemapBreadcrumb() {
+      const breadcrumbEl = document.getElementById('treemap-breadcrumb');
+      if (!breadcrumbEl) return;
+
+      // Build path from root to current
+      const path = [];
+      let node = treemapCurrent;
+
+      // Walk up using path comparison
+      const findPath = (root, target, currentPath) => {
+        if (root.path === target.path) {
+          return [...currentPath, root];
+        }
+        if (root.children) {
+          for (const child of root.children) {
+            const result = findPath(child, target, [...currentPath, root]);
+            if (result) return result;
+          }
+        }
+        return null;
+      };
+
+      const pathNodes = findPath(treemapRoot, treemapCurrent, []) || [treemapRoot];
+
+      breadcrumbEl.innerHTML = pathNodes.map((n, i) => {
+        const isLast = i === pathNodes.length - 1;
+        return \`<span class="\${isLast ? 'current' : ''}" data-path="\${n.path}">\${n.name}</span>\${isLast ? '' : ' / '}\`;
+      }).join('');
+
+      // Add click listeners
+      breadcrumbEl.querySelectorAll('span:not(.current)').forEach(span => {
+        span.addEventListener('click', () => {
+          const targetPath = span.dataset.path;
+          const findNode = (root, path) => {
+            if (root.path === path) return root;
+            if (root.children) {
+              for (const child of root.children) {
+                const found = findNode(child, path);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          const targetNode = findNode(treemapRoot, targetPath);
+          if (targetNode) {
+            zoomToTreemapNode(targetNode);
+          }
+        });
+      });
+    }
+
     // Event listeners
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -2241,6 +3293,109 @@ export function generateDashboardHTML(data: VisualizationData): string {
     document.getElementById('search').addEventListener('input', (e) => {
       searchNodes(e.target.value);
     });
+
+    // Visualize search results button
+    document.getElementById('visualize-search-btn').addEventListener('click', visualizeSearchResults);
+
+    function visualizeSearchResults() {
+      if (lastSearchMatches.length < 2) return;
+
+      // Get IDs of all matches
+      const matchIds = new Set(lastSearchMatches.map(m => m.data.id));
+
+      // Find all edges between matches (using call graph data)
+      const callGraphData = vizData.graphs.callGraph;
+      const relevantEdges = [];
+      const neighborIds = new Set();
+
+      if (callGraphData) {
+        for (const edge of callGraphData.edges) {
+          const sourceMatch = matchIds.has(edge.data.source);
+          const targetMatch = matchIds.has(edge.data.target);
+
+          if (sourceMatch && targetMatch) {
+            // Edge between two matches
+            relevantEdges.push(edge);
+          } else if (sourceMatch || targetMatch) {
+            // Edge to/from a neighbor - add the neighbor
+            if (sourceMatch) neighborIds.add(edge.data.target);
+            if (targetMatch) neighborIds.add(edge.data.source);
+            relevantEdges.push(edge);
+          }
+        }
+      }
+
+      // Build nodes: matches + neighbors (neighbors will be faded)
+      const allNodes = [];
+      const allNodeIds = new Set();
+
+      // Add match nodes
+      for (const match of lastSearchMatches) {
+        allNodes.push({
+          ...match,
+          data: { ...match.data, searchMatch: true }
+        });
+        allNodeIds.add(match.data.id);
+      }
+
+      // Add neighbor nodes (from call graph)
+      if (callGraphData) {
+        for (const node of callGraphData.nodes) {
+          if (neighborIds.has(node.data.id) && !allNodeIds.has(node.data.id)) {
+            allNodes.push({
+              ...node,
+              data: { ...node.data, searchMatch: false }
+            });
+            allNodeIds.add(node.data.id);
+          }
+        }
+      }
+
+      // Filter edges to only include those with both endpoints in our node set
+      const finalEdges = relevantEdges.filter(e =>
+        allNodeIds.has(e.data.source) && allNodeIds.has(e.data.target)
+      );
+
+      // Clear drill history and switch to this custom view
+      drillHistory = [];
+      updateBackButton();
+
+      // Initialize cytoscape with custom styles for matches vs neighbors
+      destroyCy();
+
+      // Show cy container
+      document.getElementById('cy').style.display = 'block';
+      document.getElementById('list-view').style.display = 'none';
+      document.getElementById('legend').style.display = 'block';
+
+      // Hide custom views
+      ['smells', 'hotspots', 'gallery', 'timeline', 'treemap'].forEach(v => {
+        const el = document.getElementById(v + '-view');
+        if (el) el.classList.remove('active');
+      });
+
+      initCytoscape({ nodes: allNodes, edges: finalEdges });
+
+      // Apply styles: highlight matches, fade neighbors
+      if (cy) {
+        cy.nodes().forEach(node => {
+          if (node.data('searchMatch') === false) {
+            node.style('opacity', 0.4);
+          }
+        });
+      }
+
+      // Update description
+      document.getElementById('view-description').innerHTML =
+        '<strong>Search Results Graph</strong> - ' + lastSearchMatches.length + ' matches for "' +
+        escapeHtml(lastSearchQuery) + '" with their connections. Faded nodes are neighbors.';
+
+      // Update breadcrumb
+      updateBreadcrumb([{ label: 'Search: ' + lastSearchQuery }]);
+
+      // Clear tab active state
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    }
 
     // View mode toggle (visual/list)
     document.querySelectorAll('.view-toggle-btn').forEach(btn => {

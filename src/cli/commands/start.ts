@@ -49,42 +49,32 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   console.log(chalk.bold('Starting aimem services...\n'));
 
-  // Start proxy (mockttp-based, pure Node.js)
+  // Start proxy (mockttp-based)
   if (startProxy) {
     const existingPid = getServicePid('proxy');
     if (existingPid) {
       console.log(chalk.yellow(`Proxy already running (PID ${existingPid})`));
     } else {
-      const proxyDaemonPath = join(__dirname, '..', '..', 'proxy', 'proxy-daemon.js');
+      const interceptorPath = join(__dirname, '..', '..', 'proxy', 'interceptor-mockttp.js');
 
-      try {
-        const child = spawn('node', [proxyDaemonPath], {
-          detached: true,
-          stdio: 'ignore',
-          env: {
-            ...process.env,
-            AIMEM_DATA_DIR: dataDir,
-            AIMEM_PROXY_PORT: String(port),
-          },
-        });
+      const child = spawn('node', [interceptorPath], {
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          AIMEM_DATA_DIR: dataDir,
+          AIMEM_PROXY_PORT: String(port),
+        },
+      });
 
-        if (child.pid) {
-          writePidFile('proxy', child.pid);
-          child.unref();
-          console.log(chalk.green(`Proxy started on port ${port} (PID ${child.pid})`));
-          console.log(chalk.gray(`  Configure tools with: HTTP_PROXY=http://localhost:${port}`));
+      if (child.pid) {
+        writePidFile('proxy', child.pid);
+        child.unref();
+        console.log(chalk.green(`Proxy started on port ${port} (PID ${child.pid})`));
+        console.log(chalk.gray(`  Configure tools with: HTTPS_PROXY=http://localhost:${port}`));
 
-          // Show cert path
-          const certPath = join(dataDir, 'ca-cert.pem');
-          if (existsSync(certPath)) {
-            console.log(chalk.gray(`  CA certificate: ${certPath}`));
-          } else {
-            console.log(chalk.gray(`  CA certificate will be generated at: ${certPath}`));
-          }
-        }
-      } catch (err) {
-        console.log(chalk.red('Failed to start proxy.'));
-        console.log(chalk.gray(`  Error: ${err}`));
+        const certPath = join(dataDir, 'ca-cert.pem');
+        console.log(chalk.gray(`  CA certificate: ${certPath}`));
       }
     }
   }

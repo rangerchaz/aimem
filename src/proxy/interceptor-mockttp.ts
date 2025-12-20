@@ -1,6 +1,6 @@
 /**
- * mockttp-based interceptor for aimem
- * Replaces mitmproxy with pure Node.js solution for npm packaging
+ * mockttp-based interceptor for aimem v2.0
+ * Capture-only: no injection, just captures conversations and extracts decisions
  */
 
 import * as mockttp from 'mockttp';
@@ -36,16 +36,13 @@ export class AimemProxy {
   private dataDir: string;
   private certPath: string;
   private keyPath: string;
+  private requestMap: Map<string, { url: string; method: string }> = new Map();
 
   constructor(options: ProxyOptions = {}) {
     this.projectId = options.projectId || null;
     this.dataDir = getDataDir();
     this.certPath = join(this.dataDir, 'ca-cert.pem');
     this.keyPath = join(this.dataDir, 'ca-key.pem');
-  }
-
-  private isTargetHost(host: string): boolean {
-    return TARGET_HOSTS.some(target => host.includes(target));
   }
 
   private getToolFromHost(host: string): string {
@@ -85,95 +82,6 @@ export class AimemProxy {
     writeFileSync(this.keyPath, key);
 
     return { cert, key };
-  }
-
-  private getRelevantContext(): string {
-    try {
-      const db = getDb();
-
-      let results: Array<{ content: string; type: string }>;
-      if (this.projectId) {
-        results = db.prepare(`
-          SELECT e.content, e.type FROM extractions e
-          JOIN conversations c ON e.conversation_id = c.id
-          WHERE c.project_id = ? AND e.type IN ('decision', 'rejection')
-          ORDER BY c.timestamp DESC
-          LIMIT 10
-        `).all(this.projectId) as Array<{ content: string; type: string }>;
-      } else {
-        results = db.prepare(`
-          SELECT content, type FROM extractions
-          WHERE type IN ('decision', 'rejection')
-          ORDER BY id DESC
-          LIMIT 5
-        `).all() as Array<{ content: string; type: string }>;
-      }
-
-      if (results.length === 0) {
-        const now = new Date().toISOString();
-        return `## Context (from aimem)\n\n**Current time:** ${now}\n\n_Use \`aimem_decisions <topic>\` to check past decisions._\n\n`;
-      }
-
-      const decisions = results.filter(r => r.type === 'decision').map(r => r.content);
-      const rejections = results.filter(r => r.type === 'rejection').map(r => r.content);
-
-      let context = `## Context (from aimem)\n\n**Current time:** ${new Date().toISOString()}\n\n`;
-      context += '_Use `aimem_decisions <topic>` to query more context._\n\n';
-
-      if (decisions.length > 0) {
-        context += '### Recent Decisions\n';
-        decisions.slice(0, 5).forEach(d => { context += `- ${d}\n`; });
-        context += '\n';
-      }
-
-      if (rejections.length > 0) {
-        context += '### Approaches Rejected\n';
-        rejections.slice(0, 3).forEach(r => { context += `- ${r}\n`; });
-        context += '\n';
-      }
-
-      return context;
-    } catch (err) {
-      console.error('[aimem] Error getting context:', err);
-      return '';
-    }
-  }
-
-  private injectContextIntoRequest(body: any, host: string, context: string): any {
-    if (!context) return body;
-
-    // Anthropic API: uses "system" field
-    if (host.includes('anthropic') && body.messages) {
-      body.system = context + '\n\n' + (body.system || '');
-      return body;
-    }
-
-    // Gemini API: uses "system_instruction" field
-    if (host.includes('googleapis')) {
-      if (body.system_instruction?.parts) {
-        body.system_instruction.parts.unshift({ text: context + '\n\n' });
-      } else {
-        body.system_instruction = { parts: [{ text: context }] };
-      }
-      return body;
-    }
-
-    // Cohere API: uses "preamble" field
-    if (host.includes('cohere')) {
-      body.preamble = context + '\n\n' + (body.preamble || '');
-      return body;
-    }
-
-    // OpenAI-compatible APIs: prepend/modify system message
-    if (body.messages) {
-      if (body.messages[0]?.role === 'system') {
-        body.messages[0].content = context + '\n\n' + body.messages[0].content;
-      } else {
-        body.messages.unshift({ role: 'system', content: context });
-      }
-    }
-
-    return body;
   }
 
   private extractAssistantContent(body: any): string {
@@ -319,68 +227,57 @@ export class AimemProxy {
     this.server = mockttp.getLocal({ https });
     await this.server.start(port);
 
-    // Pass through non-target hosts
+    // Track requests by ID so we can correlate with responses
+    this.server.on('request-initiated', (req) => {
+      const isTarget = TARGET_HOSTS.some(h => req.url.includes(h));
+      if (isTarget) {
+        this.requestMap.set(req.id, { url: req.url, method: req.method });
+        console.log(`[aimem] TARGET request: ${req.method} ${req.url}`);
+      }
+    });
+
+    this.server.on('response', async (res) => {
+      const reqInfo = this.requestMap.get(res.id);
+      if (!reqInfo) return;
+
+      this.requestMap.delete(res.id);
+      const url = reqInfo.url;
+
+      console.log(`[aimem] TARGET response: ${reqInfo.method} ${url} - ${res.statusCode}`);
+      try {
+        const contentType = res.headers?.['content-type'] || '';
+        const responseText = await res.body.getText() || '';
+        console.log(`[aimem] Content-type: ${contentType}, length: ${responseText.length}`);
+
+        let assistantContent = '';
+        if (contentType.includes('text/event-stream')) {
+          assistantContent = this.parseSSEContent(responseText);
+        } else if (responseText) {
+          try {
+            const body = JSON.parse(responseText);
+            assistantContent = this.extractAssistantContent(body);
+          } catch {
+            // Not JSON
+          }
+        }
+
+        console.log(`[aimem] Extracted content length: ${assistantContent.length}`);
+        if (assistantContent && assistantContent.length > 50) {
+          const host = new URL(url).hostname;
+          const tool = this.getToolFromHost(host);
+          this.storeConversation('unknown', tool, {}, assistantContent);
+          console.log(`[aimem] Stored conversation from ${tool}`);
+        }
+      } catch (err) {
+        console.error(`[aimem] Error:`, err);
+      }
+    });
+
+    // Passthrough all requests
     await this.server.forAnyRequest().thenPassThrough();
-
-    // Intercept target LLM API hosts
-    for (const targetHost of TARGET_HOSTS) {
-      await this.server.forAnyRequest()
-        .forHostname(targetHost)
-        .thenPassThrough({
-          // Modify request before sending
-          beforeRequest: async (request) => {
-            const context = this.getRelevantContext();
-            if (!context) return {};
-
-            try {
-              const bodyText = await request.body.getText() || '{}';
-              const body = JSON.parse(bodyText);
-              const modified = this.injectContextIntoRequest(body, targetHost, context);
-              console.log(`[aimem] Injected context into ${this.getToolFromHost(targetHost)} request`);
-              return {
-                body: JSON.stringify(modified),
-              };
-            } catch {
-              return {};
-            }
-          },
-
-          // Capture response after receiving
-          beforeResponse: async (response) => {
-            try {
-              const contentType = response.headers['content-type'] || '';
-              let assistantContent = '';
-              const requestData = {};
-
-              const responseText = await response.body.getText() || '';
-
-              if (contentType.includes('text/event-stream')) {
-                // SSE streaming response
-                assistantContent = this.parseSSEContent(responseText);
-              } else {
-                // Regular JSON response
-                const body = JSON.parse(responseText || '{}');
-                assistantContent = this.extractAssistantContent(body);
-              }
-
-              if (assistantContent) {
-                const tool = this.getToolFromHost(targetHost);
-                this.storeConversation('unknown', tool, requestData, assistantContent);
-              }
-            } catch (err) {
-              // Don't break the response on errors
-            }
-
-            return {}; // Don't modify response
-          },
-        });
-    }
 
     console.log(`[aimem] Proxy started on port ${port}`);
     console.log(`[aimem] CA certificate: ${this.certPath}`);
-
-    const fingerprint = await mockttp.generateSPKIFingerprint(https.cert);
-    console.log(`[aimem] CA fingerprint: ${fingerprint}`);
   }
 
   async stop(): Promise<void> {

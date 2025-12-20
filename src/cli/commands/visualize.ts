@@ -8,6 +8,7 @@ import {
   getAllProjectStructures,
   getAllProjectLinks,
   getAllProjectExtractions,
+  getFullConversations,
 } from '../../db/index.js';
 import { buildVisualizationData, generateDashboard } from '../../visualize/index.js';
 import { startDashboardServer } from '../../visualize/server.js';
@@ -38,11 +39,13 @@ export async function visualizeCommand(options: VisualizeOptions): Promise<void>
   const files = getProjectFiles(project.id);
   const links = getAllProjectLinks(project.id);
   const extractions = getAllProjectExtractions(project.id);
+  const conversations = getFullConversations(project.id, 1000); // Get up to 1000 conversations
 
   console.log(chalk.gray(`  ${structures.length} structures`));
   console.log(chalk.gray(`  ${files.length} files`));
   console.log(chalk.gray(`  ${links.length} links`));
   console.log(chalk.gray(`  ${extractions.length} extractions`));
+  console.log(chalk.gray(`  ${conversations.length} conversations`));
   console.log();
 
   if (structures.length === 0) {
@@ -51,7 +54,7 @@ export async function visualizeCommand(options: VisualizeOptions): Promise<void>
   }
 
   // Build visualization data
-  const vizData = buildVisualizationData(project, structures, files, links, extractions);
+  const vizData = buildVisualizationData(project, structures, files, links, extractions, conversations);
 
   if (options.serve) {
     // Serve mode
@@ -67,7 +70,8 @@ export async function visualizeCommand(options: VisualizeOptions): Promise<void>
           getAllProjectStructures(project.id),
           getProjectFiles(project.id),
           getAllProjectLinks(project.id),
-          getAllProjectExtractions(project.id)
+          getAllProjectExtractions(project.id),
+          getFullConversations(project.id, 1000)
         ),
       });
 

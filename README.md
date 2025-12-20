@@ -53,7 +53,7 @@ AI coding assistants forget everything between sessions. You explain your archit
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **CLI** | `src/cli/` | Commands: init, start, stop, status, query, setup, import |
+| **CLI** | `src/cli/` | Commands: init, start, stop, status, query, setup, import, visualize |
 | **Database** | `src/db/` | SQLite + FTS5 for storage and search |
 | **Indexer** | `src/indexer/` | Parse code into structures (functions, classes, etc.) |
 | **Parsers** | `src/indexer/parsers/` | Language-specific parsers (JS/TS, Python, Ruby, Go) |
@@ -61,6 +61,7 @@ AI coding assistants forget everything between sessions. You explain your archit
 | **Query** | `src/query/` | Search and format context for injection |
 | **MCP Server** | `src/mcp/` | Model Context Protocol tools for Claude Code |
 | **Proxy** | `src/proxy/` | Python mitmproxy addon for interception |
+| **Visualize** | `src/visualize/` | Interactive dashboard with Cytoscape.js and D3.js |
 
 ### Data Flow
 
@@ -228,23 +229,36 @@ aimem visualize --serve              # Start live server on port 8080
 aimem visualize --serve --port 3000  # Custom port
 ```
 
-**Dashboard Features:**
+**Views:**
 
 | View | Description |
 |------|-------------|
 | **Overview** | All files in your codebase at a glance |
 | **Call Graph** | Function/method call relationships |
-| **Dependencies** | File-level relationships |
+| **Dependencies** | File-level import/require relationships |
 | **Classes** | Class hierarchy and methods |
 | **Decisions** | Architectural decisions linked to code |
+| **Code Smells** | Automated detection of large files, long functions, hub code |
+| **Hotspots** | Complexity hotspots: largest functions, most connected code |
+| **Gallery** | Browse all decisions, patterns, and rejections from conversations |
+| **Timeline** | Conversation history over time with affected code |
+| **Treemap** | Hierarchical view of codebase by size (D3.js), click to zoom |
+
+**Code Smells Detection:**
+- Large files (>10 structures)
+- Long functions (>100 lines)
+- Too many callers/callees (>10 connections)
+- Severity levels: high, medium, low
 
 **Interactions:**
 - **Click** - View details and source code
 - **Double-click** - Drill down into files, classes, or functions
 - **Search** - Find by name, file path, or signature
+- **Visualize Search** - Show search results as connected graph
 - **Flow tracing** - Trace downstream calls or upstream callers
 - **Visual/List toggle** - Switch between graph and list views
 - **Back button** - Navigate drill-down history
+- **Treemap zoom** - Click directories to zoom in, breadcrumb to navigate back
 
 ## Proxy Setup
 

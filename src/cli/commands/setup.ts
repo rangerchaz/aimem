@@ -43,16 +43,6 @@ function getAimemPath(): string {
   return 'npx aimem';
 }
 
-function getMitmdumpPath(): string | null {
-  try {
-    const result = execSync('which mitmdump', { encoding: 'utf-8' }).trim();
-    if (result) return result;
-  } catch {
-    // Not found
-  }
-  return null;
-}
-
 function readJsonFile(path: string): Record<string, unknown> | null {
   try {
     if (!existsSync(path)) return null;
@@ -97,27 +87,21 @@ function getShellProfile(): string {
   return join(home, '.bashrc');
 }
 
-function ensureMitmproxyCert(): string | null {
-  const certPath = join(homedir(), '.mitmproxy', 'mitmproxy-ca-cert.pem');
+function getAimemCertPath(): string {
+  return join(homedir(), '.aimem', 'ca-cert.pem');
+}
+
+function ensureAimemCert(): string | null {
+  const certPath = getAimemCertPath();
 
   if (existsSync(certPath)) {
     return certPath;
   }
 
-  // Need to start mitmproxy once to generate certs
-  console.log(chalk.yellow('Generating mitmproxy certificates...'));
-  try {
-    // Start and immediately stop mitmproxy to generate certs
-    execSync('mitmdump --version', { encoding: 'utf-8' });
-    // Run mitmdump briefly in background to generate certs
-    execSync('timeout 2 mitmdump -p 0 2>/dev/null || true', { encoding: 'utf-8' });
-
-    if (existsSync(certPath)) {
-      return certPath;
-    }
-  } catch {
-    // Ignore
-  }
+  // Certificate will be generated when proxy starts
+  // For now, return the expected path
+  console.log(chalk.yellow('CA certificate will be generated when proxy starts.'));
+  console.log(chalk.yellow('Run `aimem start` first, then run setup again to install the cert.\n'));
 
   return null;
 }
@@ -135,7 +119,7 @@ async function installCertificate(certPath: string, platform: string): Promise<b
     }
 
     if (platform === 'linux') {
-      const destPath = '/usr/local/share/ca-certificates/mitmproxy-ca-cert.crt';
+      const destPath = '/usr/local/share/ca-certificates/aimem-ca-cert.crt';
       console.log('Adding certificate to system CA store (requires sudo)...');
       execSync(`sudo cp "${certPath}" "${destPath}" && sudo update-ca-certificates`, {
         stdio: 'inherit',
@@ -145,16 +129,16 @@ async function installCertificate(certPath: string, platform: string): Promise<b
 
     if (platform === 'wsl') {
       // For WSL, install to both Linux and Windows
-      const destPath = '/usr/local/share/ca-certificates/mitmproxy-ca-cert.crt';
+      const destPath = '/usr/local/share/ca-certificates/aimem-ca-cert.crt';
       console.log('Adding certificate to Linux CA store (requires sudo)...');
       execSync(`sudo cp "${certPath}" "${destPath}" && sudo update-ca-certificates`, {
         stdio: 'inherit',
       });
 
       console.log(chalk.yellow('\nFor Windows applications, you also need to install the cert on Windows:'));
-      console.log(chalk.cyan(`  1. Open: ${certPath.replace(/^\/mnt\//, '').replace(/\//g, '\\\\')}`));
-      console.log(chalk.cyan('  2. Or run in PowerShell (as admin):'));
-      console.log(chalk.cyan(`     certutil -addstore -f "ROOT" "${certPath}"`));
+      console.log(chalk.cyan(`  1. Copy cert to Windows: cp ${certPath} /mnt/c/temp/aimem-ca-cert.crt`));
+      console.log(chalk.cyan('  2. Run in PowerShell (as admin):'));
+      console.log(chalk.cyan('     certutil -addstore -f "ROOT" C:\\temp\\aimem-ca-cert.crt'));
       return true;
     }
 
@@ -409,8 +393,8 @@ async function setupClaudeCode(options: { force?: boolean }): Promise<void> {
   console.log(chalk.cyan('     aimem start'));
   console.log('  4. Run `aimem init` in your project directory to index it\n');
 
-  console.log(chalk.yellow('Note: The proxy captures decisions in real-time and injects'));
-  console.log(chalk.yellow('context into requests. MCP provides query tools.\n'));
+  console.log(chalk.yellow('Note: The proxy captures decisions in real-time.'));
+  console.log(chalk.yellow('MCP provides query tools for retrieving context on-demand.\n'));
 }
 
 async function setupProxy(options: { port?: string; install?: boolean; autostart?: boolean }): Promise<void> {
@@ -419,16 +403,6 @@ async function setupProxy(options: { port?: string; install?: boolean; autostart
   const port = options.port || '8080';
   const install = options.install || false;
   const autostart = options.autostart || false;
-
-  // Check for mitmproxy
-  const mitmdumpPath = getMitmdumpPath();
-  if (!mitmdumpPath) {
-    console.log(chalk.red('mitmproxy not found!\n'));
-    console.log('Install mitmproxy first:');
-    console.log(chalk.cyan('  pip install mitmproxy\n'));
-    process.exit(1);
-  }
-  console.log(`Found mitmdump at: ${chalk.cyan(mitmdumpPath)}`);
 
   const platform = getPlatform();
   console.log(`Detected platform: ${chalk.cyan(platform)}`);
@@ -450,12 +424,14 @@ ${aimemPath} start --port ${port}
   writeFileSync(scriptPath, startupScript, { mode: 0o755 });
 
   // Write profile snippet (for manual sourcing)
+  const certPath = getAimemCertPath();
   const profileAdditions = `
 # aimem proxy configuration
 export HTTP_PROXY=http://localhost:${port}
 export HTTPS_PROXY=http://localhost:${port}
-# Uncomment if needed for Node.js apps with self-signed certs:
-# export NODE_TLS_REJECT_UNAUTHORIZED=0
+export NODE_EXTRA_CA_CERTS="${certPath}"
+# Fallback for apps that don't respect NODE_EXTRA_CA_CERTS:
+export NODE_TLS_REJECT_UNAUTHORIZED=0
 `;
   const profileSnippetPath = join(aimemDir, 'proxy-env.sh');
   writeFileSync(profileSnippetPath, profileAdditions);
@@ -468,12 +444,12 @@ export HTTPS_PROXY=http://localhost:${port}
     // Full installation mode
     console.log(chalk.bold('\n--- Full Installation Mode ---\n'));
 
-    // Step 1: Ensure certificate exists
-    const certPath = ensureMitmproxyCert();
+    // Step 1: Ensure certificate exists (or start proxy to generate it)
+    const certPath = ensureAimemCert();
     if (!certPath) {
-      console.log(chalk.red('Could not find or generate mitmproxy certificate.'));
-      console.log(chalk.yellow('Start the proxy once with: aimem start'));
-      console.log(chalk.yellow('Then run: aimem setup proxy --install\n'));
+      console.log(chalk.yellow('To complete setup:'));
+      console.log('  1. Run: ' + chalk.cyan('aimem start'));
+      console.log('  2. Then run: ' + chalk.cyan('aimem setup proxy --install'));
       return;
     }
     console.log(chalk.green(`Certificate found: ${certPath}`));
@@ -518,9 +494,9 @@ export HTTPS_PROXY=http://localhost:${port}
     console.log('  1. Start the proxy:');
     console.log(chalk.cyan(`     aimem start --port ${port}\n`));
 
-    console.log('  2. Trust the mitmproxy CA certificate:');
-    console.log(chalk.cyan('     # Visit http://mitm.it in browser (proxy must be running)'));
-    console.log(chalk.cyan('     # Or manually install from ~/.mitmproxy/mitmproxy-ca-cert.pem\n'));
+    console.log('  2. Trust the CA certificate:');
+    console.log(chalk.cyan(`     # Certificate is at: ${certPath}`));
+    console.log(chalk.cyan('     # Install it to your system trust store\n'));
 
     console.log('  3. Set environment variables (add to your shell profile):');
     console.log(chalk.cyan(`     export HTTP_PROXY=http://localhost:${port}`));
@@ -560,14 +536,14 @@ async function setupCursor(options: { port?: string }): Promise<void> {
   }
 }\n`));
 
-  console.log(chalk.bold('Option 2: Proxy mode (full capture + injection)\n'));
+  console.log(chalk.bold('Option 2: Proxy mode (full capture)\n'));
   console.log('1. Run: ' + chalk.cyan(`aimem setup proxy --port ${port}`));
   console.log('2. Start proxy: ' + chalk.cyan('aimem start'));
   console.log('3. In Cursor settings, set HTTP proxy to: ' + chalk.cyan(`http://localhost:${port}`));
-  console.log('4. Trust the mitmproxy CA certificate\n');
+  console.log('4. Trust the CA certificate at: ' + chalk.cyan(getAimemCertPath()) + '\n');
 
   console.log(chalk.yellow('Note: MCP mode provides query tools but won\'t auto-capture decisions.'));
-  console.log('Use proxy mode for full context capture and injection.\n');
+  console.log('Use proxy mode for automatic decision capture.\n');
 }
 
 async function setupContinue(options: { port?: string }): Promise<void> {

@@ -7,13 +7,12 @@ import {
 import {
   searchStructures,
   searchConversations,
-  getStructuresByName,
   structureExists,
   fileExists,
-  getLinksTo,
-  getConversationExtractions,
-  getExtraction,
   searchExtractions,
+  getStructuresByName,
+  getLinksTo,
+  getExtraction,
   getFile,
   getConversationById,
   searchFullConversations,
@@ -48,8 +47,8 @@ export async function startMcpServer(): Promise<void> {
             },
             type: {
               type: 'string',
-              enum: ['all', 'structures', 'conversations'],
-              description: 'What to search: all, structures, or conversations',
+              enum: ['all', 'structures', 'conversations', 'decisions'],
+              description: 'What to search: all, structures, conversations, or decisions',
               default: 'all',
             },
             limit: {
@@ -59,34 +58,6 @@ export async function startMcpServer(): Promise<void> {
             },
           },
           required: ['query'],
-        },
-      },
-      {
-        name: 'aimem_context',
-        description: 'Get relevant context for a specific code entity (function, class, file). Returns the structure details plus any related decisions and conversations.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            name: {
-              type: 'string',
-              description: 'Name of the function, class, or entity to get context for',
-            },
-          },
-          required: ['name'],
-        },
-      },
-      {
-        name: 'aimem_decisions',
-        description: 'Get all decisions made about a specific code entity. Useful for understanding why something was built a certain way.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            entity: {
-              type: 'string',
-              description: 'Name of the entity to get decisions for',
-            },
-          },
-          required: ['entity'],
         },
       },
       {
@@ -145,7 +116,7 @@ export async function startMcpServer(): Promise<void> {
           const type = (args?.type as string) || 'all';
           const limit = (args?.limit as number) || 10;
 
-          const results: { structures?: unknown[]; conversations?: unknown[] } = {};
+          const results: { structures?: unknown[]; conversations?: unknown[]; decisions?: unknown[] } = {};
 
           if (type === 'all' || type === 'structures') {
             const structures = searchStructures(query, limit);
@@ -168,93 +139,47 @@ export async function startMcpServer(): Promise<void> {
             }));
           }
 
-          return {
-            content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
-          };
-        }
+          if (type === 'all' || type === 'decisions') {
+            const decisions: Array<{ type: string; content: string; source: string }> = [];
+            const seen = new Set<string>();
 
-        case 'aimem_context': {
-          const entityName = args?.name as string;
-          const structures = getStructuresByName(entityName);
-
-          if (structures.length === 0) {
-            return {
-              content: [{ type: 'text', text: `No entity found with name: ${entityName}` }],
-            };
-          }
-
-          const context = structures.map(s => {
-            const file = getFile(s.file_id);
-            const links = getLinksTo('structure', s.id);
-
-            return {
-              type: s.type,
-              name: s.name,
-              file: file?.path,
-              line: s.line_start,
-              signature: s.signature,
-              content: s.raw_content,
-              relatedConversations: links.filter(l => l.source_type === 'conversation').length,
-              decisions: links.filter(l => l.link_type === 'decision').length,
-            };
-          });
-
-          return {
-            content: [{ type: 'text', text: JSON.stringify(context, null, 2) }],
-          };
-        }
-
-        case 'aimem_decisions': {
-          const entity = args?.entity as string;
-          const structures = getStructuresByName(entity);
-
-          const decisions: unknown[] = [];
-
-          if (structures.length > 0) {
-            // Found matching code structures - get linked decisions
+            // First: try to find linked decisions via structure graph
+            const structures = getStructuresByName(query);
             for (const s of structures) {
               const links = getLinksTo('structure', s.id);
               for (const link of links) {
                 if (link.source_type === 'extraction') {
                   const extraction = getExtraction(link.source_id);
-                  if (extraction) {
+                  if (extraction && !seen.has(extraction.content)) {
+                    seen.add(extraction.content);
                     decisions.push({
                       type: extraction.type,
                       content: extraction.content,
-                      link_type: link.link_type,
                       source: 'linked',
                     });
                   }
-                } else if (link.source_type === 'conversation') {
-                  const extractions = getConversationExtractions(link.source_id);
-                  decisions.push(...extractions
-                    .filter(e => e.type === 'decision' || e.type === 'rejection')
-                    .map(e => ({ ...e, source: 'linked' })));
                 }
               }
             }
-          }
 
-          // Fallback: keyword search in decision content
-          if (decisions.length === 0) {
-            const keywordResults = searchExtractions(entity, 10);
-            for (const ext of keywordResults) {
-              decisions.push({
-                type: ext.type,
-                content: ext.content,
-                source: 'keyword_search',
-              });
+            // Fallback: keyword search in extraction content
+            const keywordResults = searchExtractions(query, limit);
+            for (const e of keywordResults) {
+              if (!seen.has(e.content)) {
+                seen.add(e.content);
+                decisions.push({
+                  type: e.type,
+                  content: e.content,
+                  source: 'keyword',
+                });
+              }
             }
-          }
 
-          if (decisions.length === 0) {
-            return {
-              content: [{ type: 'text', text: `No decisions found for: ${entity}` }],
-            };
+            results.decisions = decisions.slice(0, limit);
           }
 
           return {
-            content: [{ type: 'text', text: JSON.stringify(decisions, null, 2) }],
+            content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
           };
         }
 
