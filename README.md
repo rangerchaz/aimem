@@ -4,13 +4,16 @@
 
 Every new session, your AI assistant forgets everything—architectural decisions, rejected approaches, why you built things a certain way. You waste time re-explaining context.
 
-aimem fixes this. It intercepts your LLM API calls, extracts decisions from conversations, indexes your codebase, and makes it all searchable. Next session, ask "why did we use X?" and get the answer.
+aimem fixes this. It captures your LLM conversations, extracts decisions, indexes your codebase, and makes it all searchable via MCP tools. Next session, ask "why did we use X?" and get the answer.
 
 **Your AI assistant finally remembers what you talked about yesterday.**
 
-## The Problem
+## v2.0 - Lean Architecture
 
-AI coding assistants forget everything between sessions. You explain your architecture, make decisions, reject approaches—then start fresh next time. aimem fixes this.
+- **Pure Node.js** - No Python dependencies (mockttp proxy)
+- **Capture-only** - No injection, uses CLAUDE.md for instructions
+- **3 MCP tools** - ~150 tokens overhead
+- **Git integration** - Link decisions to commits
 
 ## Architecture
 
@@ -22,10 +25,10 @@ AI coding assistants forget everything between sessions. You explain your archit
                            │ API calls
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     mitmproxy Interceptor                       │
+│                     mockttp Proxy (capture-only)                │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
-│  │ Inject Context  │    │ Capture Response│    │  Extract    │ │
-│  │ (recent decisions)   │ (SSE streaming) │    │  Decisions  │ │
+│  │ Passthrough     │    │ Capture Response│    │  Extract    │ │
+│  │ (no injection)  │    │ (SSE streaming) │    │  Decisions  │ │
 │  └─────────────────┘    └─────────────────┘    └─────────────┘ │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
@@ -35,17 +38,16 @@ AI coding assistants forget everything between sessions. You explain your archit
 │  ┌──────────┐ ┌──────────┐ ┌─────────────┐ ┌───────────────┐   │
 │  │ projects │ │ files    │ │ structures  │ │ conversations │   │
 │  └──────────┘ └──────────┘ └─────────────┘ └───────────────┘   │
-│  ┌──────────┐ ┌──────────┐                                      │
-│  │extractions│ │ links   │   + FTS5 full-text search           │
-│  └──────────┘ └──────────┘                                      │
+│  ┌──────────┐ ┌──────────┐ ┌─────────────┐                     │
+│  │extractions│ │ commits │ │    links    │  + FTS5 search     │
+│  └──────────┘ └──────────┘ └─────────────┘                     │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
           ┌────────────────┴────────────────┐
           ▼                                 ▼
 ┌─────────────────────┐          ┌─────────────────────┐
 │    MCP Server       │          │    File Watcher     │
-│  (query tools for   │          │  (live indexing)    │
-│   Claude Code)      │          │                     │
+│  (on-demand query)  │          │  (live indexing)    │
 └─────────────────────┘          └─────────────────────┘
 ```
 
@@ -53,38 +55,28 @@ AI coding assistants forget everything between sessions. You explain your archit
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **CLI** | `src/cli/` | Commands: init, start, stop, status, query, setup, import, visualize |
+| **CLI** | `src/cli/` | Commands: init, start, stop, query, setup, import, visualize, git |
 | **Database** | `src/db/` | SQLite + FTS5 for storage and search |
-| **Indexer** | `src/indexer/` | Parse code into structures (functions, classes, etc.) |
-| **Parsers** | `src/indexer/parsers/` | Language-specific parsers (JS/TS, Python, Ruby, Go) |
+| **Indexer** | `src/indexer/` | Parse code into structures (functions, classes) |
+| **Parsers** | `src/indexer/parsers/` | Language-specific (JS/TS, Python, Ruby, Go) |
 | **Extractor** | `src/extractor/` | Extract decisions/rejections from conversations |
-| **Query** | `src/query/` | Search and format context for injection |
 | **MCP Server** | `src/mcp/` | Model Context Protocol tools for Claude Code |
-| **Proxy** | `src/proxy/` | Python mitmproxy addon for interception |
-| **Visualize** | `src/visualize/` | Interactive dashboard with Cytoscape.js and D3.js |
+| **Proxy** | `src/proxy/` | mockttp-based HTTPS proxy (Node.js) |
+| **Git** | `src/git/` | Git integration: commits, blame, hooks |
+| **Visualize** | `src/visualize/` | Interactive dashboard (Cytoscape.js, D3.js) |
 
 ### Data Flow
 
 1. **Indexing**: `aimem init` parses your codebase → stores structures in SQLite
-2. **Capture**: Proxy intercepts LLM API calls → extracts decisions → stores in DB
-3. **Injection**: On new requests, proxy queries recent decisions → injects into prompt
-4. **Query**: MCP tools or CLI search the database → return relevant context
-
-## How It Works
-
-aimem creates a moving context window:
-
-- **Short-term**: Current conversation (full fidelity)
-- **Medium-term**: Related structures and recent decisions (queried, injected)
-- **Long-term**: Everything else (stored, waiting, retrievable)
-
-The proxy intercepts LLM API calls in real-time, extracts decisions, and injects relevant context into future requests.
+2. **Capture**: Proxy intercepts LLM responses → extracts decisions → stores in DB
+3. **Query**: MCP tools search on-demand → return relevant context
+4. **Git**: Link decisions to commits → track who changed what
 
 ## Installation
 
 ```bash
 # Clone and build
-git clone <repo>
+git clone https://github.com/chadcox/aimem.git
 cd aimem
 npm install
 npm run build
@@ -94,48 +86,42 @@ npm link
 
 # Verify
 aimem --version
-
-# Install mitmproxy (required for context capture)
-pip install mitmproxy
 ```
 
-Requires Node.js 18+ and Python 3.8+.
+Requires Node.js 18+. No Python required.
 
 ## Quick Start
 
 ### For Claude Code Users
 
 ```bash
-# 1. Set up proxy (installs cert + configures shell + autostart)
-aimem setup proxy --install --autostart
+# 1. Set up proxy (installs cert + configures shell)
+aimem setup proxy --install
 
-# 2. Add MCP query tools to Claude Code
+# 2. Add MCP tools to Claude Code
 aimem setup claude-code
 
 # 3. Index your project
 cd /path/to/your/project
 aimem init
 
-# 4. (Optional) Import old conversations for instant memory
+# 4. (Optional) Import old conversations
 aimem import
 
-# 5. Restart your terminal AND Claude Code
-source ~/.bashrc  # or ~/.zshrc
+# 5. (Optional) Import git history
+aimem git import
 
-# 6. Verify everything is working
-aimem status
+# 6. Restart your terminal AND Claude Code
+source ~/.bashrc  # or ~/.zshrc
 ```
 
-After restart, Claude Code will:
-- See injected context (recent decisions) in every request
-- Have MCP tools available (`aimem_decisions`, `aimem_query`, etc.)
-- Be reminded to query aimem before making claims
+After restart, Claude Code will have MCP tools available to query your project's memory.
 
 ### For Other Tools (Cursor, Continue.dev, etc.)
 
 ```bash
-# 1. Set up proxy with autostart
-aimem setup proxy --install --autostart
+# 1. Set up proxy
+aimem setup proxy --install
 
 # 2. Index your project
 cd /path/to/your/project
@@ -144,57 +130,97 @@ aimem init
 # 3. Restart your terminal
 source ~/.bashrc
 
-# 4. Configure your tool's proxy settings (if needed)
+# 4. Configure your tool's proxy settings
 # Cursor: Set HTTP proxy to http://localhost:8080 in settings
 # Continue.dev: Uses HTTP_PROXY automatically
 ```
+
+## MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `aimem_query` | Search code, conversations, decisions, commits |
+| `aimem_verify` | Check if a function/class/file exists |
+| `aimem_conversations` | Search past conversation history |
+
+### aimem_query
+
+```
+aimem_query <search> type=<type>
+
+Types:
+  all          - Search everything (default)
+  structures   - Functions, classes, methods
+  conversations - Past AI conversations
+  decisions    - Extracted decisions/rejections
+  commits      - Git commit history
+```
+
+Results include git authorship when available (author, commit hash).
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
-| `aimem init [path]` | Index a codebase (defaults to cwd) |
-| `aimem setup <tool>` | Configure aimem for an AI tool |
-| `aimem import` | Import old Claude Code conversations |
-| `aimem start` | Start proxy and file watcher |
-| `aimem stop` | Stop running services |
-| `aimem status` | Show services and database stats |
+| `aimem init [path]` | Index a codebase |
+| `aimem setup <tool>` | Configure for an AI tool |
+| `aimem import` | Import old conversations |
+| `aimem start` | Start proxy and watcher |
+| `aimem stop` | Stop services |
+| `aimem status` | Show status and stats |
 | `aimem query <search>` | Search structures and conversations |
-| `aimem visualize` | Generate interactive codebase dashboard |
+| `aimem visualize` | Generate interactive dashboard |
+| `aimem git <cmd>` | Git integration commands |
 
-### Setup Commands
+## Git Integration
+
+Track decisions alongside your git history:
 
 ```bash
-aimem setup proxy              # Show proxy setup instructions
-aimem setup proxy --install    # Full install: cert + shell profile
-aimem setup proxy --autostart  # Configure proxy to start on login
-aimem setup proxy --install --autostart  # Full setup with autostart
-aimem setup claude-code        # Add MCP server to Claude Code
-aimem setup cursor             # Show Cursor configuration
-aimem setup continue           # Show Continue.dev configuration
+# Import commit history
+aimem git import [--limit N] [--since DATE]
+
+# Link recent decisions to HEAD commit
+aimem git link [--auto]
+
+# Install git hooks (auto-link on commit)
+aimem git hooks install
+
+# Check installed hooks
+aimem git hooks status
+
+# Search commit messages
+aimem git search <query>
+
+# Show blame with aimem context
+aimem git blame <file>
 ```
 
-### Import Old Conversations
+The git integration tracks:
+- Commit history with FTS search on messages
+- Git authorship on code structures (who last modified each function)
+- Links between AI decisions and commits where they were applied
 
-Bootstrap aimem with your existing conversation history from multiple AI tools:
+### Git Hooks
+
+Install post-commit hook to auto-link decisions:
 
 ```bash
-# Preview what would be imported (recommended first)
-aimem import --dry-run
+aimem git hooks install          # Install post-commit hook
+aimem git hooks install --all    # Install all hooks
+aimem git hooks remove --all     # Remove all hooks
+```
 
-# Import from all supported sources
-aimem import
+## Import Old Conversations
 
-# Import from specific source
-aimem import --source claude    # Claude Code only
-aimem import --source aider     # Aider only
-aimem import --source continue  # Continue.dev only
+Bootstrap with existing conversation history:
 
-# Import with limit
-aimem import --limit 100
-
-# Import for a specific project
-aimem import --project /path/to/project
+```bash
+aimem import --dry-run           # Preview what would be imported
+aimem import                     # Import from all sources
+aimem import --source claude     # Claude Code only
+aimem import --source aider      # Aider only
+aimem import --source continue   # Continue.dev only
 ```
 
 **Supported sources:**
@@ -202,132 +228,40 @@ aimem import --project /path/to/project
 | Tool | Location | Format |
 |------|----------|--------|
 | Claude Code | `~/.claude/projects/` | JSONL |
-| Aider | `.aider.chat.history.md` in project | Markdown |
+| Aider | `.aider.chat.history.md` | Markdown |
 | Continue.dev | `~/.continue/sessions/` | JSON |
 
-This extracts decisions from past sessions so aimem is useful from day one.
+## Visualization Dashboard
 
-### Query Options
-
-```bash
-aimem query "function"               # Search current project
-aimem query "function" -g            # Search all projects
-aimem query "class" -t structures    # Only search code structures
-aimem query "auth" -t conversations  # Only search conversations
-aimem query "api" -l 20              # Limit to 20 results
-```
-
-### Visualization Dashboard
-
-Generate an interactive HTML dashboard to explore your codebase visually:
+Generate an interactive HTML dashboard:
 
 ```bash
 aimem visualize                      # Generate dashboard.html
 aimem visualize --output ./viz.html  # Custom output path
-aimem visualize --open               # Open in browser after generating
-aimem visualize --serve              # Start live server on port 8080
-aimem visualize --serve --port 3000  # Custom port
+aimem visualize --open               # Open in browser
+aimem visualize --serve              # Start live server
 ```
 
-**Views:**
+**Views:** Overview, Call Graph, Dependencies, Classes, Decisions, Code Smells, Hotspots, Gallery, Timeline, Treemap
 
-| View | Description |
-|------|-------------|
-| **Overview** | All files in your codebase at a glance |
-| **Call Graph** | Function/method call relationships |
-| **Dependencies** | File-level import/require relationships |
-| **Classes** | Class hierarchy and methods |
-| **Decisions** | Architectural decisions linked to code |
-| **Code Smells** | Automated detection of large files, long functions, hub code |
-| **Hotspots** | Complexity hotspots: largest functions, most connected code |
-| **Gallery** | Browse all decisions, patterns, and rejections from conversations |
-| **Timeline** | Conversation history over time with affected code |
-| **Treemap** | Hierarchical view of codebase by size (D3.js), click to zoom |
+## Teaching Claude to Use aimem
 
-**Code Smells Detection:**
-- Large files (>10 structures)
-- Long functions (>100 lines)
-- Too many callers/callees (>10 connections)
-- Severity levels: high, medium, low
+Add a `CLAUDE.md` file to your project root:
 
-**Interactions:**
-- **Click** - View details and source code
-- **Double-click** - Drill down into files, classes, or functions
-- **Search** - Find by name, file path, or signature
-- **Visualize Search** - Show search results as connected graph
-- **Flow tracing** - Trace downstream calls or upstream callers
-- **Visual/List toggle** - Switch between graph and list views
-- **Back button** - Navigate drill-down history
-- **Treemap zoom** - Click directories to zoom in, breadcrumb to navigate back
+```markdown
+## Memory (aimem)
 
-## Proxy Setup
+Before claiming something isn't implemented or needs to be built:
+1. Query `aimem_query <topic> type=decisions` to check past decisions
+2. Query `aimem_verify <name>` to check if a function/class exists
 
-The proxy is the core of aimem—it captures decisions in real-time and injects context.
-
-### Automatic Setup (Recommended)
-
-```bash
-# Full setup: installs cert to system trust store + adds env vars to shell profile
-aimem setup proxy --install
-
-# Or with autostart (starts proxy automatically on login)
-aimem setup proxy --install --autostart
-
-# Restart terminal to load env vars
-source ~/.bashrc  # or ~/.zshrc
-
-# Start the proxy (not needed if using --autostart)
-aimem start
+Available aimem tools:
+- `aimem_query <search>` - Search code, conversations, decisions, commits
+- `aimem_verify <name>` - Does this function/class/file exist?
+- `aimem_conversations <query>` - Search past conversation history
 ```
 
-### Autostart on Login
-
-The `--autostart` flag configures the proxy to start automatically:
-
-- **Linux/WSL**: Creates a systemd user service (`~/.config/systemd/user/aimem-proxy.service`)
-- **macOS**: Creates a launchd agent (`~/Library/LaunchAgents/com.aimem.proxy.plist`)
-
-Manual control (Linux/WSL):
-```bash
-systemctl --user start aimem-proxy   # Start now
-systemctl --user stop aimem-proxy    # Stop
-systemctl --user status aimem-proxy  # Check status
-systemctl --user disable aimem-proxy # Disable autostart
-```
-
-Manual control (macOS):
-```bash
-launchctl start com.aimem.proxy   # Start now
-launchctl stop com.aimem.proxy    # Stop
-launchctl unload ~/Library/LaunchAgents/com.aimem.proxy.plist  # Disable
-```
-
-### Manual Setup
-
-```bash
-# Create config files
-aimem setup proxy
-
-# Start the proxy
-aimem start
-
-# Trust the certificate (visit while proxy is running)
-# http://mitm.it
-
-# Set environment variables (add to shell profile)
-export HTTP_PROXY=http://localhost:8080
-export HTTPS_PROXY=http://localhost:8080
-```
-
-### What the Proxy Does
-
-1. **Intercepts** API calls to LLM providers
-2. **Injects** relevant context from previous sessions into requests
-3. **Extracts** decisions and patterns from responses (including SSE streaming)
-4. **Stores** everything in the local database
-5. **Deduplicates** to prevent storing the same decision twice (5-minute window)
-
-### Supported LLM APIs
+## Supported LLM APIs
 
 | Provider | API Host |
 |----------|----------|
@@ -342,87 +276,6 @@ export HTTPS_PROXY=http://localhost:8080
 | Fireworks | api.fireworks.ai |
 | DeepSeek | api.deepseek.com |
 | Replicate | api.replicate.com |
-| Ollama (local) | localhost:11434 |
-| LM Studio (local) | localhost:1234 |
-
-## Claude Code Integration
-
-```bash
-# Add MCP query tools
-aimem setup claude-code
-
-# Set up proxy for context capture
-aimem setup proxy --install
-
-# Restart Claude Code, then start the proxy
-aimem start
-```
-
-The MCP server provides query tools. The proxy handles context capture and injection.
-
-### MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `aimem_query` | Search structures and conversations |
-| `aimem_context` | Get full context for a function/class |
-| `aimem_decisions` | Get past decisions about an entity (with keyword fallback) |
-| `aimem_verify` | Check if a function/file exists (hallucination check) |
-| `aimem_conversations` | Search and retrieve full conversation history |
-
-**aimem_decisions** first looks for code structures matching the entity name, then retrieves linked decisions. If no matching structure is found, it falls back to keyword search across all decision content. Results include a `source` field indicating whether the match was `linked` (direct entity match) or `keyword_search` (content match).
-
-Run `/mcp` in Claude Code to verify the server is connected.
-
-### Teaching Claude to Use aimem
-
-The proxy automatically injects recent decisions and a reminder into every request:
-
-```
-## Previous Context (from aimem)
-
-_Use `aimem_decisions <topic>` to query more context before claiming something isn't implemented._
-
-### Recent Decisions
-- We decided to use Redis for caching
-- The authentication flow uses JWT tokens
-...
-```
-
-To reinforce this, add a `CLAUDE.md` file to your project root:
-
-```markdown
-## Memory (aimem)
-
-Before claiming something isn't implemented or needs to be built:
-1. Query `aimem_decisions <topic>` to check past decisions
-2. Query `aimem_verify <name>` to check if a function/class exists
-
-Available aimem tools:
-- `aimem_query <search>` - Search code and conversations
-- `aimem_context <entity>` - Full context for a function/class
-- `aimem_decisions <topic>` - What was decided about this topic?
-- `aimem_verify <name>` - Does this function/file exist?
-- `aimem_conversations <query>` - Search past conversation history
-```
-
-## Other Tools (Cursor, Continue.dev, etc.)
-
-Same proxy setup works for any tool:
-
-```bash
-# Set up proxy
-aimem setup proxy --install
-
-# Start proxy
-aimem start
-```
-
-**Cursor**: Set HTTP proxy to `http://localhost:8080` in settings.
-
-**Continue.dev**: Respects `HTTP_PROXY` environment variables automatically.
-
-For query tools, add MCP configuration (see `aimem setup cursor` or `aimem setup continue`).
 
 ## Supported Languages
 
@@ -431,35 +284,6 @@ For query tools, add MCP configuration (see `aimem setup cursor` or `aimem setup
 - Ruby (`.rb`, `.rake`)
 - Go (`.go`)
 
-## What Gets Indexed
-
-```json
-{
-  "type": "function",
-  "name": "processRental",
-  "file": "app/services/rental_service.rb",
-  "line": 45,
-  "signature": "processRental(customer_id, equipment_id, duration)",
-  "calls": ["validateCustomer", "checkAvailability"],
-  "called_by": ["RentalController#create"]
-}
-```
-
-Structures extracted:
-- Functions and methods
-- Classes and modules
-- Interfaces and types
-- Relationships (calls, called_by)
-
-## What Gets Extracted
-
-From conversations, aimem extracts:
-- **Decisions**: "I'll use X", "We should do Y", "The approach is Z"
-- **Rejections**: "Instead of X", "Won't use Y", "Decided against Z"
-- **Entity links**: Connects decisions to code structures mentioned
-
-These are automatically injected into future sessions as context.
-
 ## Data Storage
 
 Everything is stored locally in `~/.aimem/`:
@@ -467,88 +291,53 @@ Everything is stored locally in `~/.aimem/`:
 ```
 ~/.aimem/
 ├── aimem.db        # SQLite database
+├── ca-cert.pem     # Proxy CA certificate
+├── ca-key.pem      # Proxy CA key
 ├── proxy.pid       # Proxy process ID
-├── watcher.pid     # Watcher process ID
-├── start-proxy.sh  # Proxy startup script
-└── proxy-env.sh    # Environment variables
+└── watcher.pid     # Watcher process ID
 ```
 
 No cloud. No accounts. Code never leaves your machine.
-
-## Project Isolation
-
-Queries are scoped to the current project by default:
-
-```bash
-cd ~/projects/app-a
-aimem query "User"        # Only searches app-a
-
-cd ~/projects/app-b
-aimem query "User"        # Only searches app-b
-
-aimem query "User" -g     # Searches all projects
-```
 
 ## Database Schema
 
 - **projects**: Indexed codebases
 - **files**: Source files with content hashes
-- **structures**: Functions, classes, methods, etc.
+- **structures**: Functions, classes, methods (with git authorship)
 - **conversations**: Stored LLM conversations
-- **extractions**: Decisions, patterns, rejections from conversations
+- **extractions**: Decisions, patterns, rejections
+- **commits**: Git commit history with FTS search
+- **commit_links**: Links between commits and structures/extractions
 - **links**: Graph edges connecting entities
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Watch mode
-npm run dev
-
-# Run tests
-npm test
-
-# Run locally
-node dist/cli/index.js status
-```
 
 ## Troubleshooting
 
 **Proxy not starting?**
-- Install mitmproxy: `pip install mitmproxy`
 - Check for port conflicts: `lsof -i :8080`
 - Try a different port: `aimem start --port 8081`
 
 **Certificate issues?**
 - Run `aimem setup proxy --install` to auto-install
-- Or manually install from `~/.mitmproxy/mitmproxy-ca-cert.pem`
-- On WSL, you may need to install cert on Windows side too
-
-**Node.js SSL errors through proxy?**
-- The setup script adds `NODE_EXTRA_CA_CERTS` and `NODE_TLS_REJECT_UNAUTHORIZED=0`
-- Verify with: `echo $NODE_TLS_REJECT_UNAUTHORIZED` (should be `0`)
-- Restart your terminal after running `aimem setup proxy --install`
-
-**No context being injected?**
-- Verify proxy is running: `aimem status`
-- Check env vars are set: `echo $HTTP_PROXY`
-- Ensure your tool respects HTTP_PROXY
+- Or manually trust `~/.aimem/ca-cert.pem`
 
 **MCP not working in Claude Code?**
 - Run `/mcp` to check connection
-- Verify path in settings: `which aimem`
+- Verify path: `which aimem`
 - Restart Claude Code after setup
 
-**Autostart not working?**
-- Linux/WSL: Check with `systemctl --user status aimem-proxy`
-- macOS: Check with `launchctl list | grep aimem`
-- Ensure systemd user services are enabled: `loginctl enable-linger $USER`
-- Check logs in `~/.aimem/proxy.log` (macOS) or `journalctl --user -u aimem-proxy` (Linux)
+**No conversations being captured?**
+- Verify proxy is running: `aimem status`
+- Check env vars: `echo $HTTPS_PROXY`
+- Ensure your tool respects HTTPS_PROXY
+
+## Development
+
+```bash
+npm install        # Install dependencies
+npm run build      # Build
+npm run dev        # Watch mode
+npm test           # Run tests
+```
 
 ## License
 
