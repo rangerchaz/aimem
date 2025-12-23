@@ -4,7 +4,7 @@
  */
 
 import * as mockttp from 'mockttp';
-import { getDb, getDataDir } from '../db/index.js';
+import { getDb, getDataDir, findProjectForPath, getAllProjects } from '../db/index.js';
 import { extractDecisions, type TranscriptMessage } from '../extractor/index.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -43,6 +43,45 @@ export class AimemProxy {
     this.dataDir = getDataDir();
     this.certPath = join(this.dataDir, 'ca-cert.pem');
     this.keyPath = join(this.dataDir, 'ca-key.pem');
+  }
+
+  /**
+   * Extract file paths from content and find the best matching project
+   */
+  private detectProjectFromContent(content: string): number | null {
+    // Regex to match absolute file paths (Unix and Windows style)
+    const pathRegex = /(?:\/[\w.-]+)+(?:\/[\w.-]+)*\.\w+|(?:[A-Za-z]:\\[\w.-]+)+(?:\\[\w.-]+)*\.\w+/g;
+    const matches = content.match(pathRegex) || [];
+
+    if (matches.length === 0) return null;
+
+    // Count projects by how many file paths match
+    const projectCounts = new Map<number, number>();
+
+    for (const filePath of matches) {
+      const project = findProjectForPath(filePath);
+      if (project) {
+        projectCounts.set(project.id, (projectCounts.get(project.id) || 0) + 1);
+      }
+    }
+
+    if (projectCounts.size === 0) return null;
+
+    // Return the project with the most matches
+    let bestProjectId: number | null = null;
+    let maxCount = 0;
+    for (const [projectId, count] of projectCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        bestProjectId = projectId;
+      }
+    }
+
+    if (bestProjectId) {
+      console.log(`[aimem] Detected project ${bestProjectId} from ${maxCount} file path matches`);
+    }
+
+    return bestProjectId;
   }
 
   private getToolFromHost(host: string): string {
@@ -189,6 +228,9 @@ export class AimemProxy {
         entities: e.mentionedEntities,
       }));
 
+      // Auto-detect project from file paths in content
+      const detectedProjectId = this.projectId || this.detectProjectFromContent(assistantContent);
+
       const db = getDb();
       const now = new Date().toISOString();
 
@@ -196,7 +238,7 @@ export class AimemProxy {
         INSERT INTO conversations (project_id, model, tool, summary, raw_content, timestamp)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(
-        this.projectId,
+        detectedProjectId,
         model,
         tool,
         assistantContent.slice(0, 1000),
