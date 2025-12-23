@@ -36,7 +36,7 @@ export class AimemProxy {
   private dataDir: string;
   private certPath: string;
   private keyPath: string;
-  private requestMap: Map<string, { url: string; method: string }> = new Map();
+  private requestMap: Map<string, { url: string; method: string; body?: string }> = new Map();
 
   constructor(options: ProxyOptions = {}) {
     this.projectId = options.projectId || null;
@@ -228,8 +228,9 @@ export class AimemProxy {
         entities: e.mentionedEntities,
       }));
 
-      // Auto-detect project from file paths in content
-      const detectedProjectId = this.projectId || this.detectProjectFromContent(assistantContent);
+      // Auto-detect project from file paths in content (check both assistant content and request/tool results)
+      const fullContent = assistantContent + ' ' + JSON.stringify(requestData);
+      const detectedProjectId = this.projectId || this.detectProjectFromContent(fullContent);
 
       const db = getDb();
       const now = new Date().toISOString();
@@ -268,10 +269,17 @@ export class AimemProxy {
     await this.server.start(port);
 
     // Track requests by ID so we can correlate with responses
-    this.server.on('request-initiated', (req) => {
+    // Use 'request' event (after body received) instead of 'request-initiated'
+    this.server.on('request', async (req) => {
       const isTarget = TARGET_HOSTS.some(h => req.url.includes(h));
       if (isTarget) {
-        this.requestMap.set(req.id, { url: req.url, method: req.method });
+        let body: string | undefined;
+        try {
+          body = await req.body.getText();
+        } catch {
+          // Body not available
+        }
+        this.requestMap.set(req.id, { url: req.url, method: req.method, body });
         console.log(`[aimem] TARGET request: ${req.method} ${req.url}`);
       }
     });
@@ -289,6 +297,16 @@ export class AimemProxy {
         const responseText = await res.body.getText() || '';
         console.log(`[aimem] Content-type: ${contentType}, length: ${responseText.length}`);
 
+        // Get request body for project detection (contains user messages with file paths)
+        let requestData: any = {};
+        try {
+          if (reqInfo.body) {
+            requestData = JSON.parse(reqInfo.body);
+          }
+        } catch {
+          // Request body not available or not JSON
+        }
+
         let assistantContent = '';
         if (contentType.includes('text/event-stream')) {
           assistantContent = this.parseSSEContent(responseText);
@@ -305,7 +323,7 @@ export class AimemProxy {
         if (assistantContent && assistantContent.length > 50) {
           const host = new URL(url).hostname;
           const tool = this.getToolFromHost(host);
-          this.storeConversation('unknown', tool, {}, assistantContent);
+          this.storeConversation('unknown', tool, requestData, assistantContent);
           console.log(`[aimem] Stored conversation from ${tool}`);
         }
       } catch (err) {
