@@ -1,6 +1,10 @@
 node_modules/
 dist/
+dist-test/
 *.log
+
+# Generated visualization output
+*-dashboard.html
 .DS_Store
 *.tsbuildinfo
 
