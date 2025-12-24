@@ -16,6 +16,7 @@ import {
   getFile,
   getConversationById,
   searchFullConversations,
+  getRecentConversations,
   findProjectForPath,
   searchCommits,
 } from '../db/index.js';
@@ -221,23 +222,19 @@ export async function startMcpServer(): Promise<void> {
             };
           }
 
-          // Search conversations
-          if (!query) {
-            return {
-              content: [{ type: 'text', text: 'Please provide a query to search conversations, or an id to get a specific conversation' }],
-            };
-          }
-
           // Try to scope to current project
           const cwd = process.cwd();
           const project = findProjectForPath(cwd);
           const projectId = project?.id;
 
-          const conversations = searchFullConversations(query, limit, projectId);
+          // Get recent conversations if no query provided
+          const conversations = query
+            ? searchFullConversations(query, limit, projectId)
+            : getRecentConversations(limit, projectId);
 
           if (conversations.length === 0) {
             return {
-              content: [{ type: 'text', text: `No conversations found matching: ${query}` }],
+              content: [{ type: 'text', text: query ? `No conversations found matching: ${query}` : 'No conversations found' }],
             };
           }
 
@@ -256,7 +253,8 @@ export async function startMcpServer(): Promise<void> {
             content: [{
               type: 'text',
               text: JSON.stringify({
-                query,
+                mode: query ? 'search' : 'recent',
+                query: query || undefined,
                 count: results.length,
                 conversations: results,
               }, null, 2),

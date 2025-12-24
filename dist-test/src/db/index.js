@@ -2,25 +2,43 @@ import Database from 'better-sqlite3';
 import { homedir } from 'os';
 import { join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
-import { SCHEMA } from './schema.js';
-const DATA_DIR = join(homedir(), '.aimem');
-const DB_PATH = join(DATA_DIR, 'aimem.db');
+import { SCHEMA, MIGRATIONS, COMMIT_LINKS_SCHEMA } from './schema.js';
+function resolveDataDir() {
+    return process.env.AIMEM_DATA_DIR || join(homedir(), '.aimem');
+}
 let db = null;
 export function getDataDir() {
-    return DATA_DIR;
+    return resolveDataDir();
 }
 export function ensureDataDir() {
-    if (!existsSync(DATA_DIR)) {
-        mkdirSync(DATA_DIR, { recursive: true });
+    const dataDir = resolveDataDir();
+    if (!existsSync(dataDir)) {
+        mkdirSync(dataDir, { recursive: true });
     }
+}
+function applyMigrations(database) {
+    // Apply each migration, ignoring errors for already-applied ones
+    for (const migration of MIGRATIONS) {
+        try {
+            database.exec(migration);
+        }
+        catch {
+            // Column already exists or other expected error
+        }
+    }
+    // Apply commit_links schema
+    database.exec(COMMIT_LINKS_SCHEMA);
 }
 export function getDb() {
     if (!db) {
         ensureDataDir();
-        db = new Database(DB_PATH);
+        const dbPath = join(resolveDataDir(), 'aimem.db');
+        db = new Database(dbPath);
         db.pragma('journal_mode = WAL');
+        db.pragma('busy_timeout = 5000');
         db.pragma('foreign_keys = ON');
         db.exec(SCHEMA);
+        applyMigrations(db);
     }
     return db;
 }
@@ -267,6 +285,23 @@ export function getFullConversations(projectId, limit = 50, offset = 0) {
     LIMIT ? OFFSET ?
   `).all(projectId, limit, offset);
 }
+// Get recent conversations (optionally scoped to project)
+export function getRecentConversations(limit = 10, projectId) {
+    const db = getDb();
+    if (projectId) {
+        return db.prepare(`
+      SELECT * FROM conversations
+      WHERE project_id = ?
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `).all(projectId, limit);
+    }
+    return db.prepare(`
+    SELECT * FROM conversations
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `).all(limit);
+}
 // Search conversations and return full content
 export function searchFullConversations(query, limit = 20, projectId) {
     const db = getDb();
@@ -286,5 +321,165 @@ export function searchFullConversations(query, limit = 20, projectId) {
     ORDER BY rank
     LIMIT ?
   `).all(query, limit);
+}
+// Get all structures for a project with file paths
+export function getAllProjectStructures(projectId) {
+    const db = getDb();
+    return db.prepare(`
+    SELECT s.*, f.path as file_path
+    FROM structures s
+    JOIN files f ON s.file_id = f.id
+    WHERE f.project_id = ?
+    ORDER BY f.path, s.line_start
+  `).all(projectId);
+}
+// Get all links for a project
+export function getAllProjectLinks(projectId) {
+    const db = getDb();
+    return db.prepare(`
+    SELECT DISTINCT l.* FROM links l
+    LEFT JOIN structures s ON l.source_type = 'structure' AND l.source_id = s.id
+    LEFT JOIN files f ON s.file_id = f.id
+    LEFT JOIN conversations c ON l.source_type = 'conversation' AND l.source_id = c.id
+    WHERE f.project_id = ? OR c.project_id = ?
+  `).all(projectId, projectId);
+}
+// Get all extractions for a project
+export function getAllProjectExtractions(projectId) {
+    const db = getDb();
+    return db.prepare(`
+    SELECT e.* FROM extractions e
+    JOIN conversations c ON e.conversation_id = c.id
+    WHERE c.project_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(projectId);
+}
+// ============ Git Operations ============
+// Commit operations
+export function upsertCommit(projectId, hash, shortHash, authorName, authorEmail, timestamp, subject, body, parentHashes = []) {
+    const db = getDb();
+    const stmt = db.prepare(`
+    INSERT INTO commits (project_id, hash, short_hash, author_name, author_email, timestamp, subject, body, parent_hashes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id, hash) DO UPDATE SET
+      short_hash = excluded.short_hash,
+      author_name = excluded.author_name,
+      author_email = excluded.author_email,
+      subject = excluded.subject,
+      body = excluded.body,
+      parent_hashes = excluded.parent_hashes
+    RETURNING *
+  `);
+    return stmt.get(projectId, hash, shortHash, authorName, authorEmail, timestamp, subject, body, JSON.stringify(parentHashes));
+}
+export function getCommitByHash(projectId, hash) {
+    const db = getDb();
+    return db.prepare('SELECT * FROM commits WHERE project_id = ? AND hash = ?').get(projectId, hash);
+}
+export function getCommitById(id) {
+    const db = getDb();
+    return db.prepare('SELECT * FROM commits WHERE id = ?').get(id);
+}
+export function searchCommits(query, limit = 20, projectId) {
+    const db = getDb();
+    if (projectId) {
+        return db.prepare(`
+      SELECT c.* FROM commits c
+      JOIN commits_fts fts ON c.id = fts.rowid
+      WHERE commits_fts MATCH ? AND c.project_id = ?
+      ORDER BY rank
+      LIMIT ?
+    `).all(query, projectId, limit);
+    }
+    return db.prepare(`
+    SELECT c.* FROM commits c
+    JOIN commits_fts fts ON c.id = fts.rowid
+    WHERE commits_fts MATCH ?
+    ORDER BY rank
+    LIMIT ?
+  `).all(query, limit);
+}
+export function getRecentCommits(projectId, limit = 50) {
+    const db = getDb();
+    return db.prepare(`
+    SELECT * FROM commits WHERE project_id = ?
+    ORDER BY timestamp DESC LIMIT ?
+  `).all(projectId, limit);
+}
+// Commit link operations
+export function createCommitLink(commitId, targetType, targetId, linkType) {
+    const db = getDb();
+    const stmt = db.prepare(`
+    INSERT OR IGNORE INTO commit_links (commit_id, target_type, target_id, link_type)
+    VALUES (?, ?, ?, ?)
+    RETURNING *
+  `);
+    return stmt.get(commitId, targetType, targetId, linkType);
+}
+export function getCommitLinks(commitId) {
+    const db = getDb();
+    return db.prepare('SELECT * FROM commit_links WHERE commit_id = ?').all(commitId);
+}
+export function getLinksToCommit(targetType, targetId) {
+    const db = getDb();
+    return db.prepare('SELECT * FROM commit_links WHERE target_type = ? AND target_id = ?').all(targetType, targetId);
+}
+export function getCommitsForStructure(structureId) {
+    const db = getDb();
+    return db.prepare(`
+    SELECT c.* FROM commits c
+    JOIN commit_links cl ON c.id = cl.commit_id
+    WHERE cl.target_type = 'structure' AND cl.target_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(structureId);
+}
+export function getCommitsForExtraction(extractionId) {
+    const db = getDb();
+    return db.prepare(`
+    SELECT c.* FROM commits c
+    JOIN commit_links cl ON c.id = cl.commit_id
+    WHERE cl.target_type = 'extraction' AND cl.target_id = ?
+    ORDER BY c.timestamp DESC
+  `).all(extractionId);
+}
+// Update structure authorship
+export function updateStructureAuthorship(structureId, author, authorEmail, commitHash) {
+    const db = getDb();
+    db.prepare(`
+    UPDATE structures SET
+      last_author = ?,
+      last_author_email = ?,
+      last_commit_hash = ?
+    WHERE id = ?
+  `).run(author, authorEmail, commitHash, structureId);
+}
+// Get uncommitted decisions (extractions created since last commit)
+export function getUncommittedExtractions(projectId, sinceCommitHash) {
+    const db = getDb();
+    if (sinceCommitHash) {
+        // Get extractions created after the specified commit's timestamp
+        return db.prepare(`
+      SELECT e.* FROM extractions e
+      JOIN conversations c ON e.conversation_id = c.id
+      WHERE c.project_id = ?
+        AND c.timestamp > (
+          SELECT timestamp FROM commits WHERE project_id = ? AND hash = ?
+        )
+        AND e.id NOT IN (
+          SELECT target_id FROM commit_links WHERE target_type = 'extraction'
+        )
+      ORDER BY c.timestamp DESC
+    `).all(projectId, projectId, sinceCommitHash);
+    }
+    // Get all extractions not linked to any commit
+    return db.prepare(`
+    SELECT e.* FROM extractions e
+    JOIN conversations c ON e.conversation_id = c.id
+    WHERE c.project_id = ?
+      AND e.id NOT IN (
+        SELECT target_id FROM commit_links WHERE target_type = 'extraction'
+      )
+    ORDER BY c.timestamp DESC
+  `).all(projectId);
 }
 //# sourceMappingURL=index.js.map

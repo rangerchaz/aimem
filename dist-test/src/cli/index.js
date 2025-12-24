@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { createRequire } from 'module';
 import { initCommand } from './commands/init.js';
 import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
@@ -8,11 +9,15 @@ import { queryCommand } from './commands/query.js';
 import { mcpServeCommand } from './commands/mcp-serve.js';
 import { setupCommand } from './commands/setup.js';
 import { importCommand } from './commands/import.js';
+import { visualizeCommand } from './commands/visualize.js';
+import { gitCommand } from './commands/git.js';
+const require = createRequire(import.meta.url);
+const packageJson = require('../../package.json');
 const program = new Command();
 program
     .name('aimem')
     .description('Local memory system for AI coding assistants')
-    .version('0.1.0');
+    .version(packageJson.version);
 program
     .command('init [path]')
     .description('Initialize aimem for a codebase')
@@ -90,5 +95,23 @@ program
         full: options.full,
     });
 });
+// Visualize codebase as interactive dashboard
+program
+    .command('visualize')
+    .description('Generate an interactive visualization dashboard of the codebase')
+    .option('-o, --output <path>', 'Output file path (default: ./aimem-dashboard.html)')
+    .option('--open', 'Open dashboard in browser after generating')
+    .option('-s, --serve', 'Start a local server instead of generating a static file')
+    .option('-p, --port <port>', 'Server port when using --serve (default: 8080)')
+    .action(async (options) => {
+    await visualizeCommand({
+        output: options.output,
+        open: options.open,
+        serve: options.serve,
+        port: options.port ? parseInt(options.port, 10) : undefined,
+    });
+});
+// Git integration commands
+program.addCommand(gitCommand);
 program.parse();
 //# sourceMappingURL=index.js.map

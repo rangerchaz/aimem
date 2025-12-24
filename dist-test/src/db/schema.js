@@ -129,5 +129,72 @@ CREATE TRIGGER IF NOT EXISTS conversations_au AFTER UPDATE ON conversations BEGI
   INSERT INTO conversations_fts(rowid, summary, raw_content)
   VALUES (new.id, new.summary, new.raw_content);
 END;
+
+-- Git commits table
+CREATE TABLE IF NOT EXISTS commits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  hash TEXT NOT NULL,
+  short_hash TEXT,
+  author_name TEXT,
+  author_email TEXT,
+  timestamp TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT,
+  parent_hashes TEXT,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_commits_project ON commits(project_id);
+CREATE INDEX IF NOT EXISTS idx_commits_hash ON commits(hash);
+CREATE INDEX IF NOT EXISTS idx_commits_timestamp ON commits(timestamp);
+
+-- Full-text search for commits
+CREATE VIRTUAL TABLE IF NOT EXISTS commits_fts USING fts5(
+  subject,
+  body,
+  content='commits',
+  content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS commits_ai AFTER INSERT ON commits BEGIN
+  INSERT INTO commits_fts(rowid, subject, body)
+  VALUES (new.id, new.subject, new.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS commits_ad AFTER DELETE ON commits BEGIN
+  INSERT INTO commits_fts(commits_fts, rowid, subject, body)
+  VALUES ('delete', old.id, old.subject, old.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS commits_au AFTER UPDATE ON commits BEGIN
+  INSERT INTO commits_fts(commits_fts, rowid, subject, body)
+  VALUES ('delete', old.id, old.subject, old.body);
+  INSERT INTO commits_fts(rowid, subject, body)
+  VALUES (new.id, new.subject, new.body);
+END;
+`;
+// Migrations for existing databases
+export const MIGRATIONS = [
+    // Migration 1: Add git authorship columns to structures
+    `ALTER TABLE structures ADD COLUMN last_author TEXT;`,
+    `ALTER TABLE structures ADD COLUMN last_author_email TEXT;`,
+    `ALTER TABLE structures ADD COLUMN last_commit_hash TEXT;`,
+];
+// Links between commits and other entities use a separate table to avoid schema migration issues
+export const COMMIT_LINKS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS commit_links (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commit_id INTEGER NOT NULL,
+  target_type TEXT NOT NULL CHECK (target_type IN ('structure', 'file', 'extraction', 'conversation')),
+  target_id INTEGER NOT NULL,
+  link_type TEXT NOT NULL CHECK (link_type IN ('modified', 'committed_in', 'introduced')),
+  FOREIGN KEY (commit_id) REFERENCES commits(id) ON DELETE CASCADE,
+  UNIQUE(commit_id, target_type, target_id, link_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_commit_links_commit ON commit_links(commit_id);
+CREATE INDEX IF NOT EXISTS idx_commit_links_target ON commit_links(target_type, target_id);
 `;
 //# sourceMappingURL=schema.js.map

@@ -1,4 +1,4 @@
-import { getLineNumber, extractLines } from './base.js';
+import { getLineNumber, extractLines, extractCalls } from './base.js';
 const patterns = {
     // func name(...) or func (r Receiver) name(...)
     function: /^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(([^)]*)\)\s*(?:\([^)]*\)|[\w\[\]]+|\*\w+)?/gm,
@@ -44,16 +44,18 @@ export const goParser = {
             const lineEnd = getLineNumber(content, blockEnd);
             // Check if it's a method (has receiver)
             const isMethod = match[0].includes(') ' + name);
+            const rawContent = extractLines(content, lineStart, lineEnd);
             structures.push({
                 type: isMethod ? 'method' : 'function',
                 name,
                 lineStart,
                 lineEnd,
                 signature: match[0].trim(),
-                rawContent: extractLines(content, lineStart, lineEnd),
+                rawContent,
                 metadata: {
                     params: params.split(',').map(p => p.trim()).filter(Boolean),
                 },
+                calls: extractCalls(rawContent, name),
             });
         }
         // Parse structs

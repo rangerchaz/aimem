@@ -1,4 +1,4 @@
-import { getLineNumber, extractLines } from './base.js';
+import { getLineNumber, extractLines, extractCalls } from './base.js';
 const patterns = {
     // def name(...):
     function: /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*[^:]+)?:/gm,
@@ -52,26 +52,30 @@ export const pythonParser = {
                     }
                 }
                 if (isMethod) {
+                    const rawContent = extractLines(content, lineStart, lineEnd);
                     structures.push({
                         type: 'method',
                         name,
                         lineStart,
                         lineEnd,
                         signature: `def ${name}(${params})`,
-                        rawContent: extractLines(content, lineStart, lineEnd),
+                        rawContent,
                         metadata: { params: params.split(',').map(p => p.trim()).filter(Boolean) },
+                        calls: extractCalls(rawContent, name),
                     });
                     continue;
                 }
             }
+            const rawContent = extractLines(content, lineStart, lineEnd);
             structures.push({
                 type: 'function',
                 name,
                 lineStart,
                 lineEnd,
                 signature: `def ${name}(${params})`,
-                rawContent: extractLines(content, lineStart, lineEnd),
+                rawContent,
                 metadata: { params: params.split(',').map(p => p.trim()).filter(Boolean) },
+                calls: extractCalls(rawContent, name),
             });
         }
         // Parse classes

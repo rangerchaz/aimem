@@ -354,6 +354,24 @@ export function getFullConversations(projectId: number, limit = 50, offset = 0):
   `).all(projectId, limit, offset) as Conversation[];
 }
 
+// Get recent conversations (optionally scoped to project)
+export function getRecentConversations(limit = 10, projectId?: number): Conversation[] {
+  const db = getDb();
+  if (projectId) {
+    return db.prepare(`
+      SELECT * FROM conversations
+      WHERE project_id = ?
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `).all(projectId, limit) as Conversation[];
+  }
+  return db.prepare(`
+    SELECT * FROM conversations
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `).all(limit) as Conversation[];
+}
+
 // Search conversations and return full content
 export function searchFullConversations(query: string, limit = 20, projectId?: number): Conversation[] {
   const db = getDb();
