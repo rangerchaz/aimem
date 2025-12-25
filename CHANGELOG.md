@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2024-12-24
+
+### Added
+- **DIK (Digital Interface Knowledge)**: Earned authority system where AI's attitude scales with track record
+  - DIK levels 1-9 with distinct personalities (humble to veteran)
+  - Guardrails with categories: design, architecture, naming, security, performance, testing
+  - Pattern analyzer to infer rules from codebase
+  - Linter import: `.eslintrc`, `.rubocop.yml`, `tsconfig.json`, `pyproject.toml`, `.prettierrc`
+  - Ambient personality mode for consistent AI tone
+  - Vindication tracking (user overrides AI, later regrets it)
+  - Manual DIK level setter
+
+- **New CLI commands**:
+  - `aimem guardrails list/add/confirm/reject/status/set/ambient`
+  - `aimem guardrails analyze [--save]` - Infer rules from codebase
+  - `aimem guardrails import-linters [--dry-run]` - Import from linter configs
+  - `aimem reindex [path] [--full] [--with-blame]` - Manual reindexing
+
+- **New MCP tools**:
+  - `aimem_guardrails_check`, `_add`, `_list`, `_confirm`, `_reject`
+  - `aimem_guardrails_override`, `_vindicate`, `_analyze`
+  - `aimem_guardrails_config`, `_personality`, `_set_dik`
+
+### Changed
+- Complete README rewrite with new philosophy section
+- Updated architecture to include guardrails module
+
 ## [0.1.5] - 2024-12-23
 
 ### Fixed

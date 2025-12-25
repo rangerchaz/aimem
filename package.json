@@ -1,6 +1,6 @@
 {
   "name": "@rangerchaz/aimem",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Local memory system for AI coding assistants",
   "type": "module",
   "main": "dist/cli/index.js",

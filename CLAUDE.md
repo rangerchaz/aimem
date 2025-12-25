@@ -44,9 +44,10 @@ Context retrieval: MCP tools query SQLite on-demand
 | `src/indexer/` | Code parser that extracts functions/classes/methods from source files |
 | `src/indexer/parsers/` | Language-specific parsers (JS/TS, Python, Ruby, Go) |
 | `src/extractor/` | Decision extraction from conversation text |
-| `src/cli/commands/` | CLI commands (init, reindex, start, stop, status, query, setup, import, visualize, git) |
+| `src/cli/commands/` | CLI commands (init, reindex, start, stop, status, query, setup, import, visualize, git, guardrails) |
 | `src/git/` | Git integration: commit parsing, blame tracking, hooks |
 | `src/visualize/` | Interactive HTML dashboard using Cytoscape.js and D3.js |
+| `src/guardrails/` | DIK (Digital Interface Knowledge) system: calculator, analyzer, enforcer, responder, linter-import |
 
 ### Database Schema (SQLite)
 
@@ -58,6 +59,9 @@ Context retrieval: MCP tools query SQLite on-demand
 - **commits**: Git commit history with FTS search
 - **commit_links**: Links between commits and structures/extractions
 - **links**: Graph edges connecting entities (extraction→structure, structure→structure)
+- **guardrails**: Project rules (category, rule, severity, source)
+- **guardrail_events**: Rule triggers, overrides, vindications
+- **project_dik**: DIK level and stats per project
 
 ### Proxy Architecture
 
@@ -96,3 +100,26 @@ The git integration tracks:
 - Commit history with FTS search on messages
 - Git authorship on code structures (who last modified each function)
 - Links between AI decisions and the commits where they were applied
+
+## Guardrails (DIK)
+
+DIK (Digital Interface Knowledge) is an earned authority system. The AI learns codebase patterns and earns the right to push back.
+
+```bash
+aimem guardrails list            # List all rules
+aimem guardrails add <cat> <rule> # Add explicit rule
+aimem guardrails analyze --save  # Infer rules from codebase
+aimem guardrails import-linters  # Import from .eslintrc, .rubocop.yml, etc.
+aimem guardrails status          # Show DIK level and stats
+aimem guardrails set <level>     # Manually set DIK level (1-10)
+aimem guardrails ambient on/off  # Toggle ambient personality mode
+```
+
+Guardrails MCP tools:
+- `aimem_guardrails_check` - Check if action violates rules
+- `aimem_guardrails_list` - List rules + DIK level
+- `aimem_guardrails_add` - Add explicit rule
+- `aimem_guardrails_confirm` - Confirm inferred rule (+DIK)
+- `aimem_guardrails_override` - Override triggered rule
+- `aimem_guardrails_vindicate` - Mark override as regretted (+DIK)
+- `aimem_guardrails_personality` - Get current personality injection
