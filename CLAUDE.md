@@ -44,7 +44,7 @@ Context retrieval: MCP tools query SQLite on-demand
 | `src/indexer/` | Code parser that extracts functions/classes/methods from source files |
 | `src/indexer/parsers/` | Language-specific parsers (JS/TS, Python, Ruby, Go) |
 | `src/extractor/` | Decision extraction from conversation text |
-| `src/cli/commands/` | CLI commands (init, start, stop, status, query, setup, import, visualize, git) |
+| `src/cli/commands/` | CLI commands (init, reindex, start, stop, status, query, setup, import, visualize, git) |
 | `src/git/` | Git integration: commit parsing, blame tracking, hooks |
 | `src/visualize/` | Interactive HTML dashboard using Cytoscape.js and D3.js |
 

@@ -12,6 +12,8 @@ import { setupCommand } from './commands/setup.js';
 import { importCommand } from './commands/import.js';
 import { visualizeCommand } from './commands/visualize.js';
 import { gitCommand } from './commands/git.js';
+import { reindexCommand } from './commands/reindex.js';
+import { guardrailsCommand } from './commands/guardrails.js';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../../package.json');
@@ -27,6 +29,18 @@ program
   .command('init [path]')
   .description('Initialize aimem for a codebase')
   .action(initCommand);
+
+program
+  .command('reindex [path]')
+  .description('Reindex a project, file, or directory')
+  .option('-f, --full', 'Clear all indexed data before reindexing')
+  .option('-b, --with-blame', 'Track git authorship for each structure')
+  .action((path, options) => {
+    reindexCommand(path, {
+      full: options.full,
+      withBlame: options.withBlame,
+    });
+  });
 
 program
   .command('start')
@@ -127,5 +141,8 @@ program
 
 // Git integration commands
 program.addCommand(gitCommand);
+
+// Guardrails (DIK) commands
+program.addCommand(guardrailsCommand);
 
 program.parse();

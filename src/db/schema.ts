@@ -183,6 +183,8 @@ export const MIGRATIONS = [
   `ALTER TABLE structures ADD COLUMN last_author TEXT;`,
   `ALTER TABLE structures ADD COLUMN last_author_email TEXT;`,
   `ALTER TABLE structures ADD COLUMN last_commit_hash TEXT;`,
+  // Migration 2: Add ambient_personality to project_dik
+  `ALTER TABLE project_dik ADD COLUMN ambient_personality INTEGER DEFAULT 0;`,
 ];
 
 // Links between commits and other entities use a separate table to avoid schema migration issues
@@ -199,4 +201,57 @@ CREATE TABLE IF NOT EXISTS commit_links (
 
 CREATE INDEX IF NOT EXISTS idx_commit_links_commit ON commit_links(commit_id);
 CREATE INDEX IF NOT EXISTS idx_commit_links_target ON commit_links(target_type, target_id);
+`;
+
+// Guardrails schema (DIK - Digital Interface Knowledge)
+export const GUARDRAILS_SCHEMA = `
+-- Guardrails: project rules and patterns
+CREATE TABLE IF NOT EXISTS guardrails (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('design', 'architecture', 'naming', 'security', 'performance', 'testing')),
+  rule TEXT NOT NULL,
+  rationale TEXT,
+  severity TEXT DEFAULT 'warn' CHECK (severity IN ('info', 'warn', 'block')),
+  source TEXT DEFAULT 'inferred' CHECK (source IN ('inferred', 'explicit', 'imported')),
+  source_file TEXT,
+  confirmed INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  active INTEGER DEFAULT 1,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- Guardrail events: track triggers, overrides, vindication
+CREATE TABLE IF NOT EXISTS guardrail_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guardrail_id INTEGER NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('triggered', 'overridden', 'accepted', 'vindicated')),
+  context TEXT,
+  response TEXT,
+  dik_level INTEGER,
+  timestamp TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (guardrail_id) REFERENCES guardrails(id) ON DELETE CASCADE
+);
+
+-- Project DIK: earned authority per project
+CREATE TABLE IF NOT EXISTS project_dik (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL UNIQUE,
+  level INTEGER DEFAULT 2,
+  rules_confirmed INTEGER DEFAULT 0,
+  rules_inferred INTEGER DEFAULT 0,
+  conversations INTEGER DEFAULT 0,
+  corrections_made INTEGER DEFAULT 0,
+  overrides_regretted INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_updated TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_guardrails_project ON guardrails(project_id);
+CREATE INDEX IF NOT EXISTS idx_guardrails_category ON guardrails(category);
+CREATE INDEX IF NOT EXISTS idx_guardrails_active ON guardrails(active);
+CREATE INDEX IF NOT EXISTS idx_events_guardrail ON guardrail_events(guardrail_id);
+CREATE INDEX IF NOT EXISTS idx_events_type ON guardrail_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_project_dik_project ON project_dik(project_id);
 `;

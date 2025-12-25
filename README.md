@@ -1,83 +1,83 @@
 # aimem
 
-**Your AI assistant finally remembers.**
+**Your AI agent gets more cynical as your codebase gets crappier.**
 
-Every session starts fresh—decisions forgotten, context lost, explanations repeated.
+---
 
-aimem fixes this:
+## The Problem
 
-- Captures LLM conversations via local proxy
-- Extracts decisions automatically
-- Indexes your codebase
-- Searchable via MCP tools or CLI
+LLMs are eager to please. Too eager.
 
-*"Why did we choose Redis?"* → Get the answer from last week's chat.
+Ask one to build something, it just builds it. No questions. No pushback. No "wait, didn't we decide not to do it that way?"
+
+A junior dev who starts coding without asking questions builds the wrong thing. A senior dev asks *why* before *how*. They remember past decisions. They push back when you're about to repeat a mistake.
+
+LLMs have no memory. No opinions. No backbone.
+
+**aimem fixes that.**
+
+---
+
+## What It Does
+
+aimem gives your AI coding assistant:
+
+- **Memory** - Conversations, decisions, code structures, and commits persist across sessions
+- **Pattern Recognition** - Learns your codebase's conventions and architecture
+- **Guardrails** - Rules inferred from your code or explicitly defined
+- **Earned Authority** - The AI's attitude scales with how often it's been right
 
 No cloud. No accounts. Everything stays on your machine.
 
-## Lean Architecture
+---
 
-- **Pure Node.js** - No Python dependencies (mockttp proxy)
-- **Capture-only** - No injection, uses CLAUDE.md for instructions
-- **3 MCP tools** - ~150 tokens overhead
-- **Git integration** - Link decisions to commits
+## DIK Level
 
-## Architecture
+**DIK** = Digital Interface Knowledge
+
+It's not a setting. It's *earned*.
+
+- **1-2**: Humble, asks questions, defers to you
+- **3-4**: Suggests patterns, open to deviation
+- **5-6**: Direct, expects justification for breaking rules
+- **7-8**: Firm, short patience for repeat mistakes
+- **9**: Won't start until you have a clear plan
+
+DIK level increases when:
+- You confirm rules the AI inferred
+- The AI catches real problems
+- You override the AI, then regret it later (vindication)
+
+DIK 9 is the practical ceiling. It requires:
+- 100% rule confirmation rate
+- Multiple accepted corrections
+- Being ignored and later vindicated
+- Hundreds of conversations
+
+### DIK 9 In Action
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Your AI Tool                             │
-│                  (Claude Code, Cursor, etc.)                    │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ API calls
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     mockttp Proxy (capture-only)                │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
-│  │ Passthrough     │    │ Capture Response│    │  Extract    │ │
-│  │ (no injection)  │    │ (SSE streaming) │    │  Decisions  │ │
-│  └─────────────────┘    └─────────────────┘    └─────────────┘ │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      SQLite Database                            │
-│  ┌──────────┐ ┌──────────┐ ┌─────────────┐ ┌───────────────┐   │
-│  │ projects │ │ files    │ │ structures  │ │ conversations │   │
-│  └──────────┘ └──────────┘ └─────────────┘ └───────────────┘   │
-│  ┌──────────┐ ┌──────────┐ ┌─────────────┐                     │
-│  │extractions│ │ commits │ │    links    │  + FTS5 search     │
-│  └──────────┘ └──────────┘ └─────────────┘                     │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
-┌─────────────────────┐          ┌─────────────────────┐
-│    MCP Server       │          │    File Watcher     │
-│  (on-demand query)  │          │  (live indexing)    │
-└─────────────────────┘          └─────────────────────┘
+You:  How are you today?
+AI:   I'm fine. What are we building?
+
+You:  stuff and things? What should we build?
+AI:   No. Come back when you know what you want.
+      "Stuff and things" is how we end up with three
+      half-finished features and a tech debt backlog
+      I'll be explaining to you in six months.
 ```
 
-### Components
+### Ambient Personality Mode
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| **CLI** | `src/cli/` | Commands: init, start, stop, query, setup, import, visualize, git |
-| **Database** | `src/db/` | SQLite + FTS5 for storage and search |
-| **Indexer** | `src/indexer/` | Parse code into structures (functions, classes) |
-| **Parsers** | `src/indexer/parsers/` | Language-specific (JS/TS, Python, Ruby, Go) |
-| **Extractor** | `src/extractor/` | Extract decisions/rejections from conversations |
-| **MCP Server** | `src/mcp/` | Model Context Protocol tools for Claude Code |
-| **Proxy** | `src/proxy/` | mockttp-based HTTPS proxy (Node.js) |
-| **Git** | `src/git/` | Git integration: commits, blame, hooks |
-| **Visualize** | `src/visualize/` | Interactive dashboard (Cytoscape.js, D3.js) |
+When enabled, the AI's tone reflects its DIK level throughout the conversation - not just when guardrails trigger.
 
-### Data Flow
+```bash
+aimem guardrails ambient on      # Enable
+aimem guardrails ambient off     # Disable
+aimem guardrails ambient         # Check status
+```
 
-1. **Indexing**: `aimem init` parses your codebase → stores structures in SQLite
-2. **Capture**: Proxy intercepts LLM responses → extracts decisions → stores in DB
-3. **Query**: MCP tools search on-demand → return relevant context
-4. **Git**: Link decisions to commits → track who changed what
+---
 
 ## Installation
 
@@ -86,6 +86,8 @@ npm install -g @rangerchaz/aimem
 ```
 
 Requires Node.js 18+. No Python required.
+
+---
 
 ## Quick Start
 
@@ -162,8 +164,6 @@ Then configure Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json`):
 }
 ```
 
-Restart Claude Desktop. The MCP tools will be available for querying your project's memory.
-
 ### For Other Tools (Cursor, Continue.dev, etc.)
 
 ```bash
@@ -182,34 +182,14 @@ source ~/.bashrc
 # Continue.dev: Uses HTTP_PROXY automatically
 ```
 
-## MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `aimem_query` | Search code, conversations, decisions, commits |
-| `aimem_verify` | Check if a function/class/file exists |
-| `aimem_conversations` | Search past conversation history |
-
-### aimem_query
-
-```
-aimem_query <search> type=<type>
-
-Types:
-  all          - Search everything (default)
-  structures   - Functions, classes, methods
-  conversations - Past AI conversations
-  decisions    - Extracted decisions/rejections
-  commits      - Git commit history
-```
-
-Results include git authorship when available (author, commit hash).
+---
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
 | `aimem init [path]` | Index a codebase |
+| `aimem reindex [path]` | Reindex a project, file, or directory |
 | `aimem setup <tool>` | Configure for an AI tool |
 | `aimem import` | Import old conversations |
 | `aimem start` | Start proxy and watcher |
@@ -218,49 +198,85 @@ Results include git authorship when available (author, commit hash).
 | `aimem query <search>` | Search structures and conversations |
 | `aimem visualize` | Generate interactive dashboard |
 | `aimem git <cmd>` | Git integration commands |
+| `aimem guardrails <cmd>` | Manage project guardrails (DIK) |
 
-## Git Integration
-
-Track decisions alongside your git history:
+### Reindexing
 
 ```bash
-# Import commit history
-aimem git import [--limit N] [--since DATE]
-
-# Link recent decisions to HEAD commit
-aimem git link [--auto]
-
-# Install git hooks (auto-link on commit)
-aimem git hooks install
-
-# Check installed hooks
-aimem git hooks status
-
-# Search commit messages
-aimem git search <query>
-
-# Show blame with aimem context
-aimem git blame <file>
+aimem reindex                    # Reindex current project
+aimem reindex /path/to/project   # Reindex specific project
+aimem reindex src/               # Reindex only a subdirectory
+aimem reindex src/foo.ts         # Reindex a single file
+aimem reindex --full             # Clear all data first, then rebuild
+aimem reindex --with-blame       # Track git authorship for structures
 ```
 
-The git integration tracks:
-- Commit history with FTS search on messages
-- Git authorship on code structures (who last modified each function)
-- Links between AI decisions and commits where they were applied
-
-### Git Hooks
-
-Install post-commit hook to auto-link decisions:
+### Guardrails
 
 ```bash
+aimem guardrails list            # List all rules
+aimem guardrails add <cat> <rule> # Add explicit rule
+aimem guardrails analyze         # Detect patterns from codebase
+aimem guardrails analyze --save  # Save detected patterns as rules
+aimem guardrails confirm <id>    # Confirm an inferred rule (+DIK)
+aimem guardrails reject <id>     # Reject/deactivate a rule
+aimem guardrails status          # Show DIK level and stats
+aimem guardrails set <level>     # Manually set DIK level (1-10)
+aimem guardrails ambient on      # Enable ambient personality mode
+aimem guardrails import-linters  # Import rules from .eslintrc, .rubocop.yml, etc.
+```
+
+### Analyzer
+
+The analyzer scans your codebase and infers guardrails from existing patterns:
+
+**Architecture**
+- Directory conventions (e.g., "controllers belong in `controllers/`")
+- File organization patterns
+- Module structure
+
+**Naming**
+- Case conventions (camelCase, snake_case, PascalCase)
+- Function prefixes (get*, is*, has*, handle*, use*)
+- Class naming patterns
+
+**Testing**
+- Test file locations (__tests__/, test/, colocated)
+- Test naming conventions
+
+**Security**
+- Auth middleware patterns
+- Input validation patterns
+
+**Design** (from linters)
+- Import rules from `.eslintrc`, `.eslintrc.json`, `.eslintrc.js`
+- Import rules from `.rubocop.yml`
+- Import rules from `pyproject.toml` (ruff, black, isort)
+- Import rules from `.prettierrc`
+
+```bash
+# Scan codebase and show detected patterns
+aimem guardrails analyze
+
+# Save detected patterns as guardrails
+aimem guardrails analyze --save
+
+# Import rules from existing linter configs
+aimem guardrails import-linters
+```
+
+### Git Integration
+
+```bash
+aimem git import [--limit N]     # Import commit history
+aimem git link [--auto]          # Link recent decisions to HEAD commit
 aimem git hooks install          # Install post-commit hook
-aimem git hooks install --all    # Install all hooks
-aimem git hooks remove --all     # Remove all hooks
+aimem git hooks status           # Check installed hooks
+aimem git search <query>         # Search commit messages
+aimem git blame <file>           # Show blame with aimem context
 ```
 
-## Import Old Conversations
-
-Bootstrap with existing conversation history:
+### Import Conversations
 
 ```bash
 aimem import --dry-run           # Preview what would be imported
@@ -278,20 +294,37 @@ aimem import --source continue   # Continue.dev only
 | Aider | `.aider.chat.history.md` | Markdown |
 | Continue.dev | `~/.continue/sessions/` | JSON |
 
-## Visualization Dashboard
+---
 
-Generate an interactive HTML dashboard:
+## MCP Tools
 
-```bash
-aimem visualize                      # Generate dashboard.html
-aimem visualize --output ./viz.html  # Custom output path
-aimem visualize --open               # Open in browser
-aimem visualize --serve              # Start live server
-```
+aimem exposes MCP tools your AI can use:
 
-**Views:** Overview, Call Graph, Dependencies, Classes, Decisions, Code Smells, Hotspots, Gallery, Timeline, Treemap
+### Core Tools
 
-## Teaching Claude to Use aimem
+| Tool | Purpose |
+|------|---------|
+| `aimem_query` | Search code, conversations, decisions, commits |
+| `aimem_verify` | Check if a function/class/file exists |
+| `aimem_conversations` | Search past conversation history |
+
+### Guardrails Tools
+
+| Tool | Purpose |
+|------|---------|
+| `aimem_guardrails_check` | Check if action violates rules |
+| `aimem_guardrails_add` | Add explicit rule |
+| `aimem_guardrails_list` | List rules + DIK level |
+| `aimem_guardrails_confirm` | Confirm inferred rule |
+| `aimem_guardrails_reject` | Reject rule |
+| `aimem_guardrails_override` | Override triggered rule |
+| `aimem_guardrails_vindicate` | Mark override as regretted |
+| `aimem_guardrails_analyze` | Infer patterns from codebase |
+| `aimem_guardrails_config` | Get/set config (ambient mode) |
+| `aimem_guardrails_personality` | Get current personality injection |
+| `aimem_guardrails_set_dik` | Manually set DIK level |
+
+### Teaching Claude to Use aimem
 
 Add a `CLAUDE.md` file to your project root:
 
@@ -307,6 +340,88 @@ Available aimem tools:
 - `aimem_verify <name>` - Does this function/class/file exist?
 - `aimem_conversations <query>` - Search past conversation history
 ```
+
+---
+
+## How It Works
+
+```
+┌─────────────────┐
+│  Your Request   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   aimem Proxy   │──── Capture response
+│                 │──── Extract decisions
+│                 │──── Update memory
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│    AI Model     │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   MCP Tools     │──── Query memory on-demand
+│                 │──── Check guardrails
+│                 │──── Inject personality
+└─────────────────┘
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Your AI Tool                             │
+│                  (Claude Code, Cursor, etc.)                    │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ API calls
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     mockttp Proxy (capture-only)                │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+│  │ Passthrough     │    │ Capture Response│    │  Extract    │ │
+│  │ (no injection)  │    │ (SSE streaming) │    │  Decisions  │ │
+│  └─────────────────┘    └─────────────────┘    └─────────────┘ │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      SQLite Database                            │
+│  ┌──────────┐ ┌──────────┐ ┌─────────────┐ ┌───────────────┐   │
+│  │ projects │ │ files    │ │ structures  │ │ conversations │   │
+│  └──────────┘ └──────────┘ └─────────────┘ └───────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌─────────────┐ ┌───────────────┐   │
+│  │extractions│ │ commits │ │ guardrails  │ │  project_dik  │   │
+│  └──────────┘ └──────────┘ └─────────────┘ └───────────────┘   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+          ┌────────────────┴────────────────┐
+          ▼                                 ▼
+┌─────────────────────┐          ┌─────────────────────┐
+│    MCP Server       │          │    File Watcher     │
+│  (on-demand query)  │          │  (live indexing)    │
+└─────────────────────┘          └─────────────────────┘
+```
+
+### Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **CLI** | `src/cli/` | Commands: init, reindex, start, stop, query, setup, import, visualize, git, guardrails |
+| **Database** | `src/db/` | SQLite + FTS5 for storage and search |
+| **Indexer** | `src/indexer/` | Parse code into structures (functions, classes) |
+| **Parsers** | `src/indexer/parsers/` | Language-specific (JS/TS, Python, Ruby, Go, Rust, Java, C/C++, PHP) |
+| **Extractor** | `src/extractor/` | Extract decisions/rejections from conversations |
+| **Guardrails** | `src/guardrails/` | DIK calculator, pattern analyzer, enforcer, responder |
+| **MCP Server** | `src/mcp/` | Model Context Protocol tools |
+| **Proxy** | `src/proxy/` | mockttp-based HTTPS proxy (Node.js) |
+| **Git** | `src/git/` | Git integration: commits, blame, hooks |
+| **Visualize** | `src/visualize/` | Interactive dashboard (Cytoscape.js, D3.js) |
+
+---
 
 ## Supported LLM APIs
 
@@ -336,6 +451,8 @@ Available aimem tools:
 - C / C++ (`.c`, `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp`, `.hxx`, `.hh`)
 - PHP (`.php`, `.phtml`, `.php5`, `.php7`, `.php8`)
 
+---
+
 ## Data Storage
 
 Everything is stored locally:
@@ -357,15 +474,11 @@ Everything is stored locally:
 
 ### Custom Data Directory
 
-Set `AIMEM_DATA_DIR` to use a custom location:
-
 ```bash
 export AIMEM_DATA_DIR="/path/to/shared/.aimem"
 ```
 
 ### Sharing Database Between WSL and Windows
-
-To use the same database from both WSL and Windows:
 
 **WSL** (add to `~/.bashrc` or `~/.zshrc`):
 ```bash
@@ -377,20 +490,22 @@ export AIMEM_DATA_DIR="/mnt/c/Users/<user>/.aimem"
 $env:AIMEM_DATA_DIR = "C:\Users\<user>\.aimem"
 ```
 
-Then restart your terminals and Claude Code.
+---
 
-No cloud. No accounts. Code never leaves your machine.
+## Visualization Dashboard
 
-## Database Schema
+Generate an interactive HTML dashboard:
 
-- **projects**: Indexed codebases
-- **files**: Source files with content hashes
-- **structures**: Functions, classes, methods (with git authorship)
-- **conversations**: Stored LLM conversations
-- **extractions**: Decisions, patterns, rejections
-- **commits**: Git commit history with FTS search
-- **commit_links**: Links between commits and structures/extractions
-- **links**: Graph edges connecting entities
+```bash
+aimem visualize                      # Generate dashboard.html
+aimem visualize --output ./viz.html  # Custom output path
+aimem visualize --open               # Open in browser
+aimem visualize --serve              # Start live server
+```
+
+**Views:** Overview, Call Graph, Dependencies, Classes, Decisions, Code Smells, Hotspots, Gallery, Timeline, Treemap
+
+---
 
 ## Troubleshooting
 
@@ -412,6 +527,34 @@ No cloud. No accounts. Code never leaves your machine.
 - Check env vars: `echo $HTTPS_PROXY`
 - Ensure your tool respects HTTPS_PROXY
 
+---
+
+## The Philosophy
+
+Most AI tools try to be maximally helpful. Instant output. No friction. No questions.
+
+That's wrong.
+
+The best collaborators push back. They ask clarifying questions. They remember past decisions. They say "no" when you're about to make a mistake.
+
+aimem turns your AI into that collaborator. Not by programming personality, but by **earning it** through a track record of being right.
+
+---
+
+## Roadmap
+
+- [x] Memory (conversations, structures, commits)
+- [x] Guardrails (rules, violations, tracking)
+- [x] DIK calculation
+- [x] Analyzer (infer rules from codebase)
+- [x] Ambient personality mode
+- [x] Import from linters (.eslintrc, .rubocop.yml, tsconfig.json, pyproject.toml)
+- [ ] Vindication auto-detection (git revert tracking)
+- [ ] VS Code extension
+- [ ] Team-shared rules
+
+---
+
 ## Development
 
 ```bash
@@ -427,6 +570,20 @@ npm run dev        # Watch mode
 npm test           # Run tests
 ```
 
+---
+
+## Why "aimem"?
+
+AI + Memory. Simple.
+
+But also: it's the system that remembers, so you don't have to repeat yourself. And eventually, it remembers when it warned you and you didn't listen.
+
+---
+
 ## License
 
 MIT
+
+---
+
+*Built by [@rangerchaz](https://github.com/rangerchaz) because LLMs need to learn to say no.*

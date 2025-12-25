@@ -103,3 +103,69 @@ export interface CommitLink {
   target_id: number;
   link_type: CommitLinkType;
 }
+
+// Guardrails types (DIK - Digital Interface Knowledge)
+export type GuardrailCategory = 'design' | 'architecture' | 'naming' | 'security' | 'performance' | 'testing';
+export type GuardrailSeverity = 'info' | 'warn' | 'block';
+export type GuardrailSource = 'inferred' | 'explicit' | 'imported';
+export type GuardrailEventType = 'triggered' | 'overridden' | 'accepted' | 'vindicated';
+
+export interface Guardrail {
+  id: number;
+  project_id: number;
+  category: GuardrailCategory;
+  rule: string;
+  rationale: string | null;
+  severity: GuardrailSeverity;
+  source: GuardrailSource;
+  source_file: string | null;
+  confirmed: number; // 0 or 1
+  created_at: string;
+  active: number; // 0 or 1
+}
+
+export interface GuardrailEvent {
+  id: number;
+  guardrail_id: number;
+  event_type: GuardrailEventType;
+  context: string | null;
+  response: string | null;
+  dik_level: number | null;
+  timestamp: string;
+}
+
+export interface ProjectDik {
+  id: number;
+  project_id: number;
+  level: number;
+  rules_confirmed: number;
+  rules_inferred: number;
+  conversations: number;
+  corrections_made: number;
+  overrides_regretted: number;
+  ambient_personality: number; // 0 or 1
+  created_at: string;
+  last_updated: string;
+}
+
+export interface GuardrailViolation {
+  id: number;
+  rule: string;
+  category: GuardrailCategory;
+  severity: GuardrailSeverity;
+  rationale: string | null;
+}
+
+export interface GuardrailCheckResult {
+  violations: GuardrailViolation[];
+  dik_level: number;
+  response: string;
+}
+
+export interface ProposedRule {
+  category: GuardrailCategory;
+  rule: string;
+  rationale: string;
+  confidence: number;
+  evidence: string[];
+}
