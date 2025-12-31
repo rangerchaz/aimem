@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2024-12-30
+
+### Added
+- **Vindication auto-detection**: File watcher automatically detects when user's code converges toward AI suggestions they previously overrode
+  - Heuristic-based detection using keyword matching and pattern analysis
+  - Automatic DIK boost when AI is proven right
+  - New CLI commands: `aimem guardrails overrides`, `aimem guardrails vindications`
+
+### Changed
+- **MCP tool consolidation**: Reduced from 14 to 9 tools to minimize prompt token overhead
+  - Merged `confirm/reject/override/vindicate` into `aimem_guardrails_respond`
+  - Merged `config/personality/set_dik` into `aimem_guardrails_config`
+- **Conditional tool loading**: Guardrails tools only appear when project has rules configured
+  - Projects without guardrails see only 3 core tools (~400 tokens vs ~1,300)
+
 ## [0.2.0] - 2024-12-24
 
 ### Added

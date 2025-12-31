@@ -48,6 +48,8 @@ DIK level increases when:
 - The AI catches real problems
 - You override the AI, then regret it later (vindication)
 
+**Auto-vindication:** When you override a guardrail, aimem watches for code changes. If your code later converges toward what the AI originally suggested, vindication is automatic. No manual action needed.
+
 DIK 9 is the practical ceiling. It requires:
 - 100% rule confirmation rate
 - Multiple accepted corrections
@@ -224,6 +226,8 @@ aimem guardrails status          # Show DIK level and stats
 aimem guardrails set <level>     # Manually set DIK level (1-10)
 aimem guardrails ambient on      # Enable ambient personality mode
 aimem guardrails import-linters  # Import rules from .eslintrc, .rubocop.yml, etc.
+aimem guardrails overrides       # List pending overrides awaiting vindication
+aimem guardrails vindications    # List auto-vindicated overrides
 ```
 
 ### Analyzer
@@ -298,9 +302,9 @@ aimem import --source continue   # Continue.dev only
 
 ## MCP Tools
 
-aimem exposes MCP tools your AI can use:
+aimem exposes MCP tools your AI can use. Guardrails tools only appear when your project has rules configured (reduces prompt tokens for projects that don't use them).
 
-### Core Tools
+### Core Tools (always available)
 
 | Tool | Purpose |
 |------|---------|
@@ -308,21 +312,16 @@ aimem exposes MCP tools your AI can use:
 | `aimem_verify` | Check if a function/class/file exists |
 | `aimem_conversations` | Search past conversation history |
 
-### Guardrails Tools
+### Guardrails Tools (conditional)
 
 | Tool | Purpose |
 |------|---------|
 | `aimem_guardrails_check` | Check if action violates rules |
 | `aimem_guardrails_add` | Add explicit rule |
 | `aimem_guardrails_list` | List rules + DIK level |
-| `aimem_guardrails_confirm` | Confirm inferred rule |
-| `aimem_guardrails_reject` | Reject rule |
-| `aimem_guardrails_override` | Override triggered rule |
-| `aimem_guardrails_vindicate` | Mark override as regretted |
+| `aimem_guardrails_respond` | Confirm, reject, override, or vindicate a rule |
 | `aimem_guardrails_analyze` | Infer patterns from codebase |
-| `aimem_guardrails_config` | Get/set config (ambient mode) |
-| `aimem_guardrails_personality` | Get current personality injection |
-| `aimem_guardrails_set_dik` | Manually set DIK level |
+| `aimem_guardrails_config` | Get/set config, DIK level, personality |
 
 ### Teaching Claude to Use aimem
 
@@ -549,7 +548,7 @@ aimem turns your AI into that collaborator. Not by programming personality, but 
 - [x] Analyzer (infer rules from codebase)
 - [x] Ambient personality mode
 - [x] Import from linters (.eslintrc, .rubocop.yml, tsconfig.json, pyproject.toml)
-- [ ] Vindication auto-detection (git revert tracking)
+- [x] Vindication auto-detection (file watcher tracks code convergence)
 - [ ] VS Code extension
 - [ ] Team-shared rules
 

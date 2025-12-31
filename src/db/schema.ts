@@ -185,6 +185,15 @@ export const MIGRATIONS = [
   `ALTER TABLE structures ADD COLUMN last_commit_hash TEXT;`,
   // Migration 2: Add ambient_personality to project_dik
   `ALTER TABLE project_dik ADD COLUMN ambient_personality INTEGER DEFAULT 0;`,
+  // Migration 3: Add vindication tracking columns to guardrail_events
+  `ALTER TABLE guardrail_events ADD COLUMN suggestion TEXT;`,
+  `ALTER TABLE guardrail_events ADD COLUMN code_context TEXT;`,
+  `ALTER TABLE guardrail_events ADD COLUMN file_path TEXT;`,
+  `ALTER TABLE guardrail_events ADD COLUMN line_start INTEGER;`,
+  `ALTER TABLE guardrail_events ADD COLUMN line_end INTEGER;`,
+  `ALTER TABLE guardrail_events ADD COLUMN content_hash TEXT;`,
+  `ALTER TABLE guardrail_events ADD COLUMN vindication_pending INTEGER DEFAULT 0;`,
+  `ALTER TABLE guardrail_events ADD COLUMN checked_at TEXT;`,
 ];
 
 // Links between commits and other entities use a separate table to avoid schema migration issues

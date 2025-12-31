@@ -1,7 +1,7 @@
 {
   "name": "@rangerchaz/aimem",
-  "version": "0.2.0",
-  "description": "Local memory system for AI coding assistants",
+  "version": "0.2.1",
+  "description": "Local memory and guardrails for AI coding assistants. Your AI gets more opinionated as your codebase gets crappier.",
   "type": "module",
   "main": "dist/cli/index.js",
   "bin": {
@@ -12,14 +12,25 @@
     "dev": "tsc --watch",
     "start": "node dist/cli/index.js",
     "test": "tsc -p tsconfig.test.json && node --test dist-test/test/",
-    "test:watch": "tsc -p tsconfig.test.json --watch"
+    "test:watch": "tsc -p tsconfig.test.json --watch",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "ai",
     "memory",
     "llm",
     "context",
-    "coding-assistant"
+    "coding-assistant",
+    "claude",
+    "claude-code",
+    "mcp",
+    "model-context-protocol",
+    "guardrails",
+    "anthropic",
+    "openai",
+    "cursor",
+    "aider",
+    "copilot"
   ],
   "author": "Chad Cox",
   "license": "MIT",

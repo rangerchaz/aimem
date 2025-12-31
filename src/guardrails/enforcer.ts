@@ -4,17 +4,20 @@
  * Checks if proposed actions violate any guardrails.
  */
 
+import { readFileSync, existsSync } from 'fs';
 import {
   getProjectGuardrails,
   getOrCreateProjectDik,
   getGuardrailHistory,
   insertGuardrailEvent,
+  insertGuardrailEventWithContext,
   incrementDikCounter,
   getGuardrailEvent,
 } from '../db/index.js';
 import { calculateDik } from './calculator.js';
 import { generateCombinedResponse } from './responder.js';
-import type { Guardrail, GuardrailViolation, GuardrailCheckResult, GuardrailCategory } from '../types/index.js';
+import { computeContentHash, readCodeAtLines } from './vindication-checker.js';
+import type { Guardrail, GuardrailViolation, GuardrailCheckResult, GuardrailCategory, OverrideContext } from '../types/index.js';
 
 /**
  * Check if an action violates any guardrails.
@@ -161,16 +164,50 @@ export function acceptGuardrail(guardrailId: number, projectId: number): void {
 
 /**
  * Record that a user overrode a triggered guardrail.
+ * If vindication context is provided, the override will be tracked for auto-vindication.
  */
 export function overrideGuardrail(
   guardrailId: number,
   projectId: number,
-  reason: string
+  reason: string,
+  context?: OverrideContext
 ): number {
   const dikData = getOrCreateProjectDik(projectId);
   const dikLevel = calculateDik(dikData);
 
-  const event = insertGuardrailEvent(guardrailId, 'overridden', reason, null, dikLevel);
+  // If we have context with a file path, capture code for vindication tracking
+  let vindicationContext: (OverrideContext & { codeContext?: string; contentHash?: string }) | undefined;
+
+  if (context?.filePath && context?.suggestion) {
+    vindicationContext = { ...context };
+
+    // Read current code at the specified lines (if provided)
+    if (context.lineStart && context.lineEnd) {
+      const code = readCodeAtLines(context.filePath, context.lineStart, context.lineEnd);
+      if (code) {
+        vindicationContext.codeContext = code;
+        vindicationContext.contentHash = computeContentHash(code);
+      }
+    } else if (existsSync(context.filePath)) {
+      // Read entire file if no line range specified
+      try {
+        const code = readFileSync(context.filePath, 'utf-8');
+        vindicationContext.codeContext = code.slice(0, 5000); // Limit size
+        vindicationContext.contentHash = computeContentHash(code);
+      } catch {
+        // Ignore read errors
+      }
+    }
+  }
+
+  const event = insertGuardrailEventWithContext(
+    guardrailId,
+    'overridden',
+    reason,
+    null,
+    dikLevel,
+    vindicationContext
+  );
   return event.id;
 }
 

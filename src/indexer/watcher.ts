@@ -1,7 +1,9 @@
 import { watch } from 'chokidar';
-import { relative } from 'path';
+import { join, relative } from 'path';
 import { getAllProjects, getFileByPath, deleteFile } from '../db/index.js';
 import { indexFile, getSupportedExtensions } from './index.js';
+import { checkFileForVindications } from '../guardrails/vindication-checker.js';
+import type { VindicationCheckResult } from '../types/index.js';
 
 const IGNORE_PATTERNS = [
   '**/node_modules/**',
@@ -23,6 +25,7 @@ export interface WatcherOptions {
   onIndex?: (projectId: number, path: string, structures: number) => void;
   onDelete?: (projectId: number, path: string) => void;
   onError?: (error: Error) => void;
+  onVindication?: (projectId: number, path: string, results: VindicationCheckResult[]) => void;
 }
 
 export function startWatcher(options: WatcherOptions = {}): () => void {
@@ -57,6 +60,13 @@ export function startWatcher(options: WatcherOptions = {}): () => void {
       try {
         const count = await indexFile(project.id, project.path, path);
         options.onIndex?.(project.id, path, count);
+
+        // Check for vindications on this file
+        const fullPath = join(project.path, path);
+        const vindicationResults = checkFileForVindications(project.id, fullPath);
+        if (vindicationResults.length > 0) {
+          options.onVindication?.(project.id, path, vindicationResults);
+        }
       } catch (err) {
         options.onError?.(err as Error);
       }

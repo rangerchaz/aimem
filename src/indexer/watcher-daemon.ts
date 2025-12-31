@@ -13,6 +13,15 @@ const stop = startWatcher({
   onError: (error) => {
     console.error('[aimem watcher] Error:', error.message);
   },
+  onVindication: (projectId, path, results) => {
+    for (const result of results) {
+      if (result.result.vindicated) {
+        console.log(`[aimem watcher] VINDICATED! ${path} - ${result.result.reason} (DIK now: ${result.newDikLevel})`);
+      } else {
+        console.log(`[aimem watcher] Checked ${path} - ${result.result.reason}`);
+      }
+    }
+  },
 });
 
 // Handle shutdown

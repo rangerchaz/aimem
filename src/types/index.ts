@@ -132,6 +132,15 @@ export interface GuardrailEvent {
   response: string | null;
   dik_level: number | null;
   timestamp: string;
+  // Vindication tracking fields (added via migration)
+  suggestion?: string | null;
+  code_context?: string | null;
+  file_path?: string | null;
+  line_start?: number | null;
+  line_end?: number | null;
+  content_hash?: string | null;
+  vindication_pending?: number | null;
+  checked_at?: string | null;
 }
 
 export interface ProjectDik {
@@ -168,4 +177,39 @@ export interface ProposedRule {
   rationale: string;
   confidence: number;
   evidence: string[];
+}
+
+// Vindication types
+export interface VindicationCandidate {
+  eventId: number;
+  guardrailId: number;
+  projectId: number;
+  suggestion: string;
+  filePath: string;
+  lineStart: number;
+  lineEnd: number;
+  originalCode: string;
+  contentHash: string;
+  reason: string;
+  timestamp: string;
+}
+
+export interface VindicationResult {
+  eventId: number;
+  vindicated: boolean;
+  confidence: number;
+  reason: string;
+}
+
+export interface VindicationCheckResult {
+  candidate: VindicationCandidate;
+  result: VindicationResult;
+  newDikLevel?: number;
+}
+
+export interface OverrideContext {
+  suggestion?: string;
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
 }

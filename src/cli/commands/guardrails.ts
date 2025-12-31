@@ -14,6 +14,10 @@ import {
   setAmbientPersonality,
   getGuardrailsConfig,
   setDikLevel,
+  getOverrideEventsWithRules,
+  getVindicatedEvents,
+  getPendingVindications,
+  expireOldVindications,
 } from '../../db/index.js';
 import {
   analyzeProject,
@@ -421,4 +425,110 @@ guardrailsCommand
       console.log(chalk.green(`Imported ${result.saved.length} guardrails from ${result.configs.length} linter config(s).`));
       console.log(chalk.gray('Use `aimem guardrails list` to see all rules.'));
     }
+  });
+
+// List overrides awaiting vindication
+guardrailsCommand
+  .command('overrides')
+  .description('List override events awaiting vindication')
+  .option('-a, --all', 'Include resolved overrides')
+  .option('--expire <days>', 'Expire overrides older than N days')
+  .action((options: { all?: boolean; expire?: string }) => {
+    const project = findProject();
+    if (!project) {
+      console.error(chalk.red('No aimem project found. Run `aimem init` first.'));
+      process.exit(1);
+    }
+
+    // Handle expire option
+    if (options.expire) {
+      const days = parseInt(options.expire, 10);
+      if (isNaN(days) || days < 1) {
+        console.error(chalk.red('Days must be a positive number.'));
+        process.exit(1);
+      }
+      const expired = expireOldVindications(project.id, days);
+      console.log(chalk.yellow(`Expired ${expired} pending overrides older than ${days} days.`));
+      return;
+    }
+
+    const overrides = getOverrideEventsWithRules(project.id, !options.all);
+    const pending = getPendingVindications(project.id);
+
+    console.log(chalk.blue(`\nProject: ${project.name}`));
+    console.log(chalk.gray(`Pending vindication checks: ${pending.length}`));
+    console.log();
+
+    if (overrides.length === 0) {
+      console.log(chalk.gray('No overrides found.'));
+      return;
+    }
+
+    console.log(chalk.bold(`Overrides (${overrides.length}):\n`));
+
+    for (const o of overrides) {
+      const isPending = o.vindication_pending === 1;
+      const status = isPending ? chalk.yellow('PENDING') : chalk.gray('checked');
+
+      console.log(`${chalk.bold(`#${o.id}`)} ${status} ${chalk.cyan(`[${o.category}]`)}`);
+      console.log(`  Rule: ${o.rule}`);
+      console.log(`  Reason: ${chalk.gray(o.context || 'No reason given')}`);
+      if (o.suggestion) {
+        console.log(`  Suggestion: ${chalk.italic(o.suggestion.slice(0, 100))}${o.suggestion.length > 100 ? '...' : ''}`);
+      }
+      if (o.file_path) {
+        console.log(`  File: ${chalk.gray(o.file_path)}`);
+        if (o.line_start && o.line_end) {
+          console.log(`  Lines: ${o.line_start}-${o.line_end}`);
+        }
+      }
+      console.log(`  Date: ${chalk.gray(o.timestamp)}`);
+      console.log();
+    }
+
+    if (pending.length > 0) {
+      console.log(chalk.gray('Pending overrides will be auto-checked when their files change.'));
+    }
+  });
+
+// List vindicated overrides (AI was proven right)
+guardrailsCommand
+  .command('vindications')
+  .description('List vindicated overrides (AI was right)')
+  .action(() => {
+    const project = findProject();
+    if (!project) {
+      console.error(chalk.red('No aimem project found. Run `aimem init` first.'));
+      process.exit(1);
+    }
+
+    const vindications = getVindicatedEvents(project.id);
+    const dikData = getOrCreateProjectDik(project.id);
+    const dikLevel = calculateDik(dikData);
+
+    console.log(chalk.blue(`\nProject: ${project.name}`));
+    console.log(chalk.yellow(`DIK Level: ${dikLevel}/10`));
+    console.log(chalk.green(`Total vindications: ${dikData.overrides_regretted}`));
+    console.log();
+
+    if (vindications.length === 0) {
+      console.log(chalk.gray('No vindications yet.'));
+      console.log(chalk.gray('When you override an AI suggestion and later implement it anyway, it will appear here.'));
+      return;
+    }
+
+    console.log(chalk.bold(`Recent Vindications:\n`));
+
+    for (const v of vindications) {
+      const guardrail = getGuardrail(v.guardrail_id);
+
+      console.log(`${chalk.green('✓')} ${chalk.bold(`#${v.id}`)} - ${chalk.gray(v.timestamp)}`);
+      if (guardrail) {
+        console.log(`  Rule: ${guardrail.rule}`);
+        console.log(`  Category: ${chalk.cyan(`[${guardrail.category}]`)}`);
+      }
+      console.log();
+    }
+
+    console.log(chalk.gray('Each vindication adds +1.0 to DIK track record (max 3.0 total).'));
   });

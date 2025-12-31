@@ -42,3 +42,27 @@ export {
   type LinterConfig,
   type ImportedRule,
 } from './linter-import.js';
+
+// Vindication queue exports
+export {
+  getAllPending,
+  getPendingForFiles,
+  queueCheck,
+  getQueuedChecks,
+  getQueuedChecksLimited,
+  dequeueCheck,
+  clearQueue,
+  recordResult,
+  markChecked,
+  expireOld,
+  hasQueuedChecks,
+  getQueuedCount,
+} from './vindication-queue.js';
+
+// Vindication checker exports
+export {
+  checkForVindication,
+  checkFileForVindications,
+  computeContentHash,
+  readCodeAtLines,
+} from './vindication-checker.js';

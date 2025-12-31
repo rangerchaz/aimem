@@ -55,177 +55,144 @@ export async function startMcpServer(): Promise<void> {
     }
   );
 
-  // List available tools
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      {
-        name: 'aimem_query',
-        description: 'Search code, conversations, decisions, and commits',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string', description: 'Function name, class name, or keyword' },
-            type: { type: 'string', enum: ['all', 'structures', 'conversations', 'decisions', 'commits'], default: 'all' },
-            limit: { type: 'number', default: 10 },
+  // Define base tools (always available)
+  const baseTools = [
+    {
+      name: 'aimem_query',
+      description: 'Search code, conversations, decisions, and commits',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Function name, class name, or keyword' },
+          type: { type: 'string', enum: ['all', 'structures', 'conversations', 'decisions', 'commits'], default: 'all' },
+          limit: { type: 'number', default: 10 },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'aimem_verify',
+      description: 'Check if a function, class, or file exists',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name to verify' },
+          type: { type: 'string', enum: ['structure', 'file'], default: 'structure' },
+        },
+        required: ['name'],
+      },
+    },
+    {
+      name: 'aimem_conversations',
+      description: 'Search past AI conversation history',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search keywords' },
+          id: { type: 'number', description: 'Get by ID' },
+          limit: { type: 'number', default: 5 },
+        },
+      },
+    },
+  ];
+
+  // Define guardrails tools (conditionally included)
+  const guardrailsTools = [
+    {
+      name: 'aimem_guardrails_check',
+      description: 'Check if a proposed action violates any project rules. Returns DIK-adjusted pushback if violations found.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: 'What the user wants to do' },
+          context: { type: 'string', description: 'Additional context (file being modified, etc.)' },
+        },
+        required: ['action'],
+      },
+    },
+    {
+      name: 'aimem_guardrails_add',
+      description: 'Add an explicit rule to the project guardrails',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', enum: ['design', 'architecture', 'naming', 'security', 'performance', 'testing'], description: 'Rule category' },
+          rule: { type: 'string', description: 'The actual rule' },
+          rationale: { type: 'string', description: 'Why this rule exists' },
+          severity: { type: 'string', enum: ['info', 'warn', 'block'], default: 'warn' },
+        },
+        required: ['category', 'rule'],
+      },
+    },
+    {
+      name: 'aimem_guardrails_list',
+      description: 'List guardrails for current project',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', enum: ['design', 'architecture', 'naming', 'security', 'performance', 'testing'], description: 'Filter by category' },
+          confirmed_only: { type: 'boolean', description: 'Only show user-confirmed rules', default: false },
+          active_only: { type: 'boolean', description: 'Only show active rules', default: true },
+        },
+      },
+    },
+    {
+      name: 'aimem_guardrails_respond',
+      description: 'Respond to a guardrail: confirm, reject, override, or vindicate',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['confirm', 'reject', 'override', 'vindicate'], description: 'Action to take' },
+          id: { type: 'number', description: 'Guardrail ID (for confirm/reject/override) or event ID (for vindicate)' },
+          reason: { type: 'string', description: 'Required for reject/override: why' },
+        },
+        required: ['action', 'id'],
+      },
+    },
+    {
+      name: 'aimem_guardrails_analyze',
+      description: 'Scan current project and infer rules from patterns. Use this to onboard a new project.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          categories: {
+            type: 'array',
+            items: { type: 'string', enum: ['design', 'architecture', 'naming', 'security', 'performance', 'testing'] },
+            description: 'Which categories to analyze (default: all)',
           },
-          required: ['query'],
+          save: { type: 'boolean', description: 'Save proposed rules as inferred guardrails', default: false },
         },
       },
-      {
-        name: 'aimem_verify',
-        description: 'Check if a function, class, or file exists',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Name to verify' },
-            type: { type: 'string', enum: ['structure', 'file'], default: 'structure' },
-          },
-          required: ['name'],
+    },
+    {
+      name: 'aimem_guardrails_config',
+      description: 'Get or set guardrails config. Returns status, DIK level, and personality.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          set_dik: { type: 'number', description: 'Set DIK level (1-10)', minimum: 1, maximum: 10 },
+          ambient_personality: { type: 'boolean', description: 'Enable/disable ambient personality mode' },
         },
       },
-      {
-        name: 'aimem_conversations',
-        description: 'Search past AI conversation history',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string', description: 'Search keywords' },
-            id: { type: 'number', description: 'Get by ID' },
-            limit: { type: 'number', default: 5 },
-          },
-        },
-      },
-      // Guardrails tools (DIK)
-      {
-        name: 'aimem_guardrails_check',
-        description: 'Check if a proposed action violates any project rules. Returns DIK-adjusted pushback if violations found.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            action: { type: 'string', description: 'What the user wants to do' },
-            context: { type: 'string', description: 'Additional context (file being modified, etc.)' },
-          },
-          required: ['action'],
-        },
-      },
-      {
-        name: 'aimem_guardrails_add',
-        description: 'Add an explicit rule to the project guardrails',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            category: { type: 'string', enum: ['design', 'architecture', 'naming', 'security', 'performance', 'testing'], description: 'Rule category' },
-            rule: { type: 'string', description: 'The actual rule' },
-            rationale: { type: 'string', description: 'Why this rule exists' },
-            severity: { type: 'string', enum: ['info', 'warn', 'block'], default: 'warn' },
-          },
-          required: ['category', 'rule'],
-        },
-      },
-      {
-        name: 'aimem_guardrails_list',
-        description: 'List guardrails for current project',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            category: { type: 'string', enum: ['design', 'architecture', 'naming', 'security', 'performance', 'testing'], description: 'Filter by category' },
-            confirmed_only: { type: 'boolean', description: 'Only show user-confirmed rules', default: false },
-            active_only: { type: 'boolean', description: 'Only show active rules', default: true },
-          },
-        },
-      },
-      {
-        name: 'aimem_guardrails_confirm',
-        description: 'Confirm an inferred rule (increases DIK)',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: { type: 'number', description: 'Guardrail ID to confirm' },
-          },
-          required: ['id'],
-        },
-      },
-      {
-        name: 'aimem_guardrails_reject',
-        description: 'Reject/deactivate an inferred rule',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: { type: 'number', description: 'Guardrail ID to reject' },
-            reason: { type: 'string', description: 'Why this rule is wrong' },
-          },
-          required: ['id'],
-        },
-      },
-      {
-        name: 'aimem_guardrails_override',
-        description: 'Override a triggered rule (user explicitly disagrees)',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            guardrail_id: { type: 'number', description: 'Guardrail ID being overridden' },
-            reason: { type: 'string', description: 'Why they are overriding' },
-          },
-          required: ['guardrail_id', 'reason'],
-        },
-      },
-      {
-        name: 'aimem_guardrails_vindicate',
-        description: 'Mark an override as regretted (user had to fix it). This is gold for DIK.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            event_id: { type: 'number', description: 'Override event ID' },
-          },
-          required: ['event_id'],
-        },
-      },
-      {
-        name: 'aimem_guardrails_analyze',
-        description: 'Scan current project and infer rules from patterns. Use this to onboard a new project.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            categories: {
-              type: 'array',
-              items: { type: 'string', enum: ['design', 'architecture', 'naming', 'security', 'performance', 'testing'] },
-              description: 'Which categories to analyze (default: all)',
-            },
-            save: { type: 'boolean', description: 'Save proposed rules as inferred guardrails', default: false },
-          },
-        },
-      },
-      {
-        name: 'aimem_guardrails_config',
-        description: 'Get or set guardrails configuration including ambient personality mode',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ambient_personality: { type: 'boolean', description: 'Enable/disable ambient personality mode' },
-          },
-        },
-      },
-      {
-        name: 'aimem_guardrails_personality',
-        description: 'Get the current personality injection for ambient mode. Returns text based on DIK level.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-      {
-        name: 'aimem_guardrails_set_dik',
-        description: 'Manually set DIK level (1-10). Overrides calculated value.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            level: { type: 'number', description: 'DIK level to set (1-10)', minimum: 1, maximum: 10 },
-          },
-          required: ['level'],
-        },
-      },
-    ],
-  }));
+    },
+  ];
+
+  // List available tools - conditionally include guardrails if project uses them
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const project = findProjectForPath(process.cwd());
+
+    // Check if project has guardrails configured (any rules or DIK level set)
+    let includeGuardrails = false;
+    if (project) {
+      const guardrails = getProjectGuardrails(project.id, { activeOnly: true });
+      const dikData = getOrCreateProjectDik(project.id);
+      includeGuardrails = guardrails.length > 0 || dikData.level > 1;
+    }
+
+    return {
+      tools: includeGuardrails ? [...baseTools, ...guardrailsTools] : baseTools,
+    };
+  });
 
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -502,8 +469,10 @@ export async function startMcpServer(): Promise<void> {
           };
         }
 
-        case 'aimem_guardrails_confirm': {
+        case 'aimem_guardrails_respond': {
+          const action = args?.action as 'confirm' | 'reject' | 'override' | 'vindicate';
           const id = args?.id as number;
+          const reason = args?.reason as string | undefined;
 
           const project = findProjectForPath(process.cwd());
           if (!project) {
@@ -513,76 +482,48 @@ export async function startMcpServer(): Promise<void> {
             };
           }
 
-          const success = confirmGuardrail(id);
-          if (success) {
-            incrementDikCounter(project.id, 'rules_confirmed');
+          switch (action) {
+            case 'confirm': {
+              const success = confirmGuardrail(id);
+              if (success) {
+                incrementDikCounter(project.id, 'rules_confirmed');
+              }
+              const dikData = getOrCreateProjectDik(project.id);
+              const newDikLevel = calculateDik(dikData);
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ success, action, new_dik_level: newDikLevel }, null, 2) }],
+              };
+            }
+            case 'reject': {
+              const success = deactivateGuardrail(id);
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ success, action }, null, 2) }],
+              };
+            }
+            case 'override': {
+              if (!reason) {
+                return {
+                  content: [{ type: 'text', text: 'Reason is required for override action' }],
+                  isError: true,
+                };
+              }
+              const eventId = overrideGuardrail(id, project.id, reason);
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ success: true, action, event_id: eventId }, null, 2) }],
+              };
+            }
+            case 'vindicate': {
+              const newDikLevel = vindicateOverride(id, project.id);
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ success: true, action, new_dik_level: newDikLevel }, null, 2) }],
+              };
+            }
+            default:
+              return {
+                content: [{ type: 'text', text: `Unknown action: ${action}` }],
+                isError: true,
+              };
           }
-
-          const dikData = getOrCreateProjectDik(project.id);
-          const newDikLevel = calculateDik(dikData);
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({ success, new_dik_level: newDikLevel }, null, 2),
-            }],
-          };
-        }
-
-        case 'aimem_guardrails_reject': {
-          const id = args?.id as number;
-
-          const success = deactivateGuardrail(id);
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({ success }, null, 2),
-            }],
-          };
-        }
-
-        case 'aimem_guardrails_override': {
-          const guardrailId = args?.guardrail_id as number;
-          const reason = args?.reason as string;
-
-          const project = findProjectForPath(process.cwd());
-          if (!project) {
-            return {
-              content: [{ type: 'text', text: 'No aimem project found for current directory.' }],
-              isError: true,
-            };
-          }
-
-          const eventId = overrideGuardrail(guardrailId, project.id, reason);
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({ success: true, event_id: eventId }, null, 2),
-            }],
-          };
-        }
-
-        case 'aimem_guardrails_vindicate': {
-          const eventId = args?.event_id as number;
-
-          const project = findProjectForPath(process.cwd());
-          if (!project) {
-            return {
-              content: [{ type: 'text', text: 'No aimem project found for current directory.' }],
-              isError: true,
-            };
-          }
-
-          const newDikLevel = vindicateOverride(eventId, project.id);
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({ success: true, new_dik_level: newDikLevel }, null, 2),
-            }],
-          };
         }
 
         case 'aimem_guardrails_analyze': {
@@ -628,6 +569,7 @@ export async function startMcpServer(): Promise<void> {
 
         case 'aimem_guardrails_config': {
           const ambientPersonality = args?.ambient_personality as boolean | undefined;
+          const setDikParam = args?.set_dik as number | undefined;
 
           const project = findProjectForPath(process.cwd());
           if (!project) {
@@ -637,95 +579,34 @@ export async function startMcpServer(): Promise<void> {
             };
           }
 
-          // If setting, update
+          // Apply settings if provided
           if (ambientPersonality !== undefined) {
             setAmbientPersonality(project.id, ambientPersonality);
           }
+          if (setDikParam !== undefined) {
+            setDikLevel(project.id, setDikParam);
+          }
 
-          // Get current config
+          // Get current state
           const config = getGuardrailsConfig(project.id);
           const dikData = getOrCreateProjectDik(project.id);
           const dikLevel = calculateDik(dikData);
+          const breakdown = getDikBreakdown(dikData);
 
           return {
             content: [{
               type: 'text',
               text: JSON.stringify({
-                success: true,
                 config: {
                   enabled: config.enabled,
                   ambient_personality: config.ambient_personality,
                 },
-                dik_level: dikLevel,
-              }, null, 2),
-            }],
-          };
-        }
-
-        case 'aimem_guardrails_personality': {
-          const project = findProjectForPath(process.cwd());
-          if (!project) {
-            return {
-              content: [{ type: 'text', text: 'No aimem project found for current directory.' }],
-              isError: true,
-            };
-          }
-
-          const config = getGuardrailsConfig(project.id);
-          const dikData = getOrCreateProjectDik(project.id);
-          const dikLevel = calculateDik(dikData);
-
-          if (!config.ambient_personality) {
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  enabled: false,
-                  message: 'Ambient personality is disabled. Use aimem_guardrails_config to enable.',
-                  dik_level: dikLevel,
-                }, null, 2),
-              }],
-            };
-          }
-
-          const personality = getPersonalityInjection(dikLevel);
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                enabled: true,
-                dik_level: dikLevel,
-                dik_description: describeDikLevel(dikLevel),
-                personality,
-              }, null, 2),
-            }],
-          };
-        }
-
-        case 'aimem_guardrails_set_dik': {
-          const level = args?.level as number;
-
-          const project = findProjectForPath(process.cwd());
-          if (!project) {
-            return {
-              content: [{ type: 'text', text: 'No aimem project found for current directory.' }],
-              isError: true,
-            };
-          }
-
-          setDikLevel(project.id, level);
-          const dikData = getOrCreateProjectDik(project.id);
-          const actualLevel = calculateDik(dikData);
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                dik_level: actualLevel,
-                dik_description: describeDikLevel(actualLevel),
-                personality: getPersonalityInjection(actualLevel),
+                dik: {
+                  level: dikLevel,
+                  description: describeDikLevel(dikLevel),
+                  breakdown,
+                },
+                personality: config.ambient_personality ? getPersonalityInjection(dikLevel) : null,
               }, null, 2),
             }],
           };

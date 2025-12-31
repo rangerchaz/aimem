@@ -3,7 +3,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
 import { SCHEMA, MIGRATIONS, COMMIT_LINKS_SCHEMA, GUARDRAILS_SCHEMA } from './schema.js';
-import type { Project, File, Structure, Conversation, Link, Extraction, IndexStats, Commit, CommitLink, Guardrail, GuardrailEvent, ProjectDik, GuardrailCategory, GuardrailSeverity, GuardrailSource, GuardrailEventType } from '../types/index.js';
+import type { Project, File, Structure, Conversation, Link, Extraction, IndexStats, Commit, CommitLink, Guardrail, GuardrailEvent, ProjectDik, GuardrailCategory, GuardrailSeverity, GuardrailSource, GuardrailEventType, VindicationCandidate, OverrideContext } from '../types/index.js';
 
 function resolveDataDir(): string {
   return process.env.AIMEM_DATA_DIR || join(homedir(), '.aimem');
@@ -814,4 +814,175 @@ export function isDikManuallySet(projectId: number): boolean {
   const dik = getOrCreateProjectDik(projectId);
   // If level is non-default but stats are zero, it's manually set
   return dik.level !== 2 && dik.rules_confirmed === 0 && dik.corrections_made === 0 && dik.overrides_regretted === 0 && dik.conversations === 0;
+}
+
+// ============ Vindication Operations ============
+
+// Insert guardrail event with vindication context (enhanced version)
+export function insertGuardrailEventWithContext(
+  guardrailId: number,
+  eventType: GuardrailEventType,
+  context: string | null = null,
+  response: string | null = null,
+  dikLevel: number | null = null,
+  vindicationContext?: OverrideContext & { codeContext?: string; contentHash?: string }
+): GuardrailEvent {
+  const db = getDb();
+
+  if (vindicationContext && eventType === 'overridden') {
+    const stmt = db.prepare(`
+      INSERT INTO guardrail_events (
+        guardrail_id, event_type, context, response, dik_level,
+        suggestion, code_context, file_path, line_start, line_end, content_hash, vindication_pending
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      RETURNING *
+    `);
+    return stmt.get(
+      guardrailId,
+      eventType,
+      context,
+      response,
+      dikLevel,
+      vindicationContext.suggestion || null,
+      vindicationContext.codeContext || null,
+      vindicationContext.filePath || null,
+      vindicationContext.lineStart || null,
+      vindicationContext.lineEnd || null,
+      vindicationContext.contentHash || null
+    ) as GuardrailEvent;
+  }
+
+  // Fall back to regular insert for non-override events
+  return insertGuardrailEvent(guardrailId, eventType, context, response, dikLevel);
+}
+
+// Get pending vindications for a project
+export function getPendingVindications(projectId: number): VindicationCandidate[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      e.id as eventId,
+      e.guardrail_id as guardrailId,
+      g.project_id as projectId,
+      e.suggestion,
+      e.file_path as filePath,
+      e.line_start as lineStart,
+      e.line_end as lineEnd,
+      e.code_context as originalCode,
+      e.content_hash as contentHash,
+      e.context as reason,
+      e.timestamp
+    FROM guardrail_events e
+    JOIN guardrails g ON e.guardrail_id = g.id
+    WHERE g.project_id = ?
+      AND e.event_type = 'overridden'
+      AND e.vindication_pending = 1
+      AND e.suggestion IS NOT NULL
+      AND e.file_path IS NOT NULL
+    ORDER BY e.timestamp DESC
+  `).all(projectId) as VindicationCandidate[];
+
+  return rows;
+}
+
+// Get pending vindications for specific files
+export function getPendingVindicationsForFile(projectId: number, filePath: string): VindicationCandidate[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      e.id as eventId,
+      e.guardrail_id as guardrailId,
+      g.project_id as projectId,
+      e.suggestion,
+      e.file_path as filePath,
+      e.line_start as lineStart,
+      e.line_end as lineEnd,
+      e.code_context as originalCode,
+      e.content_hash as contentHash,
+      e.context as reason,
+      e.timestamp
+    FROM guardrail_events e
+    JOIN guardrails g ON e.guardrail_id = g.id
+    WHERE g.project_id = ?
+      AND e.file_path = ?
+      AND e.event_type = 'overridden'
+      AND e.vindication_pending = 1
+      AND e.suggestion IS NOT NULL
+    ORDER BY e.timestamp DESC
+  `).all(projectId, filePath) as VindicationCandidate[];
+
+  return rows;
+}
+
+// Mark a vindication as checked (not vindicated)
+export function markVindicationChecked(eventId: number): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE guardrail_events
+    SET vindication_pending = 0, checked_at = datetime('now')
+    WHERE id = ?
+  `).run(eventId);
+}
+
+// Mark a vindication as complete (vindicated)
+export function markVindicated(eventId: number): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE guardrail_events
+    SET vindication_pending = 0, checked_at = datetime('now')
+    WHERE id = ?
+  `).run(eventId);
+}
+
+// Expire old pending vindications
+export function expireOldVindications(projectId: number, maxAgeDays: number = 30): number {
+  const db = getDb();
+  const result = db.prepare(`
+    UPDATE guardrail_events
+    SET vindication_pending = 0, checked_at = datetime('now')
+    WHERE id IN (
+      SELECT e.id FROM guardrail_events e
+      JOIN guardrails g ON e.guardrail_id = g.id
+      WHERE g.project_id = ?
+        AND e.vindication_pending = 1
+        AND datetime(e.timestamp) < datetime('now', '-' || ? || ' days')
+    )
+  `).run(projectId, maxAgeDays);
+
+  return result.changes;
+}
+
+// Get all vindicated events for a project (for CLI display)
+export function getVindicatedEvents(projectId: number): GuardrailEvent[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT e.* FROM guardrail_events e
+    JOIN guardrails g ON e.guardrail_id = g.id
+    WHERE g.project_id = ? AND e.event_type = 'vindicated'
+    ORDER BY e.timestamp DESC
+  `).all(projectId) as GuardrailEvent[];
+}
+
+// Get override events with their guardrail info (for CLI display)
+export interface OverrideEventWithRule extends GuardrailEvent {
+  rule: string;
+  category: GuardrailCategory;
+}
+
+export function getOverrideEventsWithRules(projectId: number, pendingOnly: boolean = false): OverrideEventWithRule[] {
+  const db = getDb();
+  let sql = `
+    SELECT e.*, g.rule, g.category FROM guardrail_events e
+    JOIN guardrails g ON e.guardrail_id = g.id
+    WHERE g.project_id = ? AND e.event_type = 'overridden'
+  `;
+
+  if (pendingOnly) {
+    sql += ' AND e.vindication_pending = 1';
+  }
+
+  sql += ' ORDER BY e.timestamp DESC';
+
+  return db.prepare(sql).all(projectId) as OverrideEventWithRule[];
 }
