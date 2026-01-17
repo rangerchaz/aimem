@@ -1,3 +1,4 @@
+import { createRequire } from 'module';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -42,11 +43,14 @@ import {
 } from '../guardrails/index.js';
 import type { GuardrailCategory, GuardrailSeverity } from '../types/index.js';
 
+const require = createRequire(import.meta.url);
+const { version } = require('../../package.json');
+
 export async function startMcpServer(): Promise<void> {
   const server = new Server(
     {
       name: 'aimem',
-      version: '0.1.0',
+      version,
     },
     {
       capabilities: {

@@ -7,7 +7,8 @@ import * as mockttp from 'mockttp';
 import { getDb, getDataDir, findProjectForPath, getAllProjects } from '../db/index.js';
 import { extractDecisions, type TranscriptMessage } from '../extractor/index.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 // Target API hosts to intercept
 const TARGET_HOSTS = [
@@ -352,7 +353,8 @@ export class AimemProxy {
 }
 
 // CLI entry point
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isDirectRun) {
   const port = parseInt(process.env.AIMEM_PROXY_PORT || '8080', 10);
   const proxy = new AimemProxy();
 
