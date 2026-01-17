@@ -1,6 +1,6 @@
 {
   "name": "@rangerchaz/aimem",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Local memory and guardrails for AI coding assistants. Your AI gets more opinionated as your codebase gets crappier.",
   "type": "module",
   "main": "dist/cli/index.js",
